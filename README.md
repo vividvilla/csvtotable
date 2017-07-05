@@ -1,6 +1,10 @@
 # CSVtoTable
 Simple command-line utility to convert CSV files to searchable and sortable HTML table.
 
+## Demo
+
+[Here is a demo](https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html) of [sample csv](https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv) file converted to HTML table.
+
 ## Installation
 	pip install csvtotable
 

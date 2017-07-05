@@ -9,6 +9,8 @@ Demo
 
 `Here is a demo`_ of `sample csv`_ file converted to HTML table.
 
+.. image:: https://raw.githubusercontent.com/vividvilla/csvtotable/master/sample/table.gif
+
 Installation
 ------------
 

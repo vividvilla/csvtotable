@@ -1,1 +1,3 @@
 recursive-include csvtotable *.html *.js *.py
+include LICENSE
+include README.md

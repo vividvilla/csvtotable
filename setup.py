@@ -2,9 +2,11 @@
 
 from setuptools import setup
 
+_version = "1.0.0"
+
 setup(
     name="csvtotable",
-    version="1.0.0",
+    version=_version,
     description="Simple commandline utility to convert CSV files"
     "to searchable and sortable HTML table.",
     author="Vivek R",
@@ -12,7 +14,8 @@ setup(
     url="https://vivekr.net",
     packages=["csvtotable"],
     include_package_data=True,
-    download_url="https://github.com/vividvilla/csvtotable",
+    download_url="https://github.com/vividvilla/csvtotable/archive/{}.tar.gz"
+        .format(_version),
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",

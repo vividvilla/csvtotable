@@ -11,7 +11,7 @@ setup(
     "to searchable and sortable HTML table.",
     author="Vivek R",
     author_email="vividvilla@gmail.com",
-    url="https://vivekr.net",
+    url="https://github.com/vividvilla/csvtotable",
     packages=["csvtotable"],
     include_package_data=True,
     download_url="https://github.com/vividvilla/csvtotable/archive/{}.tar.gz"

@@ -28,7 +28,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Software Development :: Libraries"
     ],
-    install_requires=["click", "jinja2", "six"],
+    install_requires=["click", "jinja2", "backports.csv"],
     entry_points={
         "console_scripts": [
             "csvtotable = csvtotable.cli:cli",

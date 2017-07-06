@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-_version = "1.0.2"
+_version = "1.0.3"
 
 setup(
     name="csvtotable",
@@ -31,7 +31,8 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Software Development :: Libraries"
     ],
-    install_requires=["click", "jinja2", "backports.csv"],
+    install_requires=["click >= 6.7", "jinja2 >= 2.9.6",
+                      "unicodecsv >= 0.14.1", "six >= 1.10.0"],
     entry_points={
         "console_scripts": [
             "csvtotable = csvtotable.cli:cli",

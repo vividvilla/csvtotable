@@ -1,9 +1,10 @@
 from __future__ import unicode_literals
 import re
 import os
+import six
 import logging
 from io import open
-from backports import csv
+import unicodecsv as csv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
@@ -33,14 +34,19 @@ def convert(input_file_name, output_file_name, **kwargs):
     delimiter = kwargs["delimiter"] or ","
     quotechar = kwargs["quotechar"] or "|"
 
-    input_file = open(input_file_name, "r", newline='', encoding="utf-8")
-    output_file = open(output_file_name, "w", newline='', encoding="utf-8")
+    if six.PY2:
+        delimiter = delimiter.encode("utf-8")
+        quotechar = quotechar.encode("utf-8")
+
+    input_file = open(input_file_name, "rb")
+    output_file = open(output_file_name, "w", encoding="utf-8")
 
     csv_rows = []
     csv_headers = []
 
     # Read CSV and form a header and rows list
-    reader = csv.reader(input_file, delimiter=delimiter, quotechar=quotechar)
+    reader = csv.reader(input_file, encoding="utf-8",
+                        delimiter=delimiter, quotechar=quotechar)
 
     # Read header from first line
     csv_headers = next(reader)

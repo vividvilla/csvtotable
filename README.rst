@@ -29,7 +29,7 @@ Convert ``data.csv`` file to ``data.html`` file
 
 ::
 
-    csvtohtml data.csv data.html
+    csvtotable data.csv data.html
 
 Options
 -------

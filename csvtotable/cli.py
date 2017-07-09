@@ -17,12 +17,12 @@ def cli(input_file, output_file, caption, delimiter, quotechar):
     """
     # Prompt for file overwrite if outfile already exists
     if os.path.exists(output_file):
-        message = "File ({}) already exists. Do you want to overwrite? (y/n): ".format(
-            output_file)
+        fmt = "File ({}) already exists. Do you want to overwrite? (y/n): "
+        message = fmt.format(output_file)
         click.secho(message, nl=False, fg="red")
         choice = click.getchar()
         click.echo()
-        if choice != "y" and choice != "Y":
+        if choice not in ("y", "Y"):
             return True
 
     # Convert CSV file

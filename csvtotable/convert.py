@@ -15,7 +15,7 @@ templates_dir = os.path.join(package_path, "templates")
 # Initialize Jinja 2 env
 env = Environment(
     loader=FileSystemLoader(templates_dir),
-    autoescape=select_autoescape(["html", "xml"])
+    autoescape=select_autoescape(["html", "xml", "j2"])
 )
 template = env.get_template("template.j2")
 

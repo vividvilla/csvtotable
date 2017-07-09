@@ -17,7 +17,7 @@ env = Environment(
     loader=FileSystemLoader(templates_dir),
     autoescape=select_autoescape(["html", "xml"])
 )
-template = env.get_template("template.html")
+template = env.get_template("template.j2")
 
 # Regex to match src property in script tags
 js_src_pattern = re.compile(r'<script.*?src=\"(.*?)\".*?<\/script>',
@@ -33,6 +33,7 @@ def convert(input_file_name, output_file_name, **kwargs):
     caption = kwargs["caption"] or ""
     delimiter = kwargs["delimiter"] or ","
     quotechar = kwargs["quotechar"] or "|"
+    display_length = kwargs["display_length"]
 
     if six.PY2:
         delimiter = delimiter.encode("utf-8")
@@ -46,8 +47,14 @@ def convert(input_file_name, output_file_name, **kwargs):
         csv_headers = next(reader)
         csv_rows = [row for row in reader]
 
+    # Template optional params
+    options = {
+        "caption": caption,
+        "display_length": display_length
+    }
+
     # Render csv to HTML
-    html = render_template(caption, csv_headers, csv_rows)
+    html = render_template(csv_headers, csv_rows, **options)
 
     # Freeze all JS files in template
     js_freezed_html = freeze_js(html)
@@ -57,14 +64,31 @@ def convert(input_file_name, output_file_name, **kwargs):
         output_file.write(js_freezed_html)
 
 
-def render_template(caption, table_headers, table_items):
+def render_template(table_headers, table_items, **options):
     """
     Render Jinja2 template
     """
+    caption = options["caption"] or "Table"
+    display_length = options["display_length"] or -1
+    default_length_menu = [-1, 10, 25, 50]
+
+    # Add display length to the default display length menu
+    length_menu = []
+    if display_length != -1:
+        length_menu = sorted(default_length_menu + [display_length])
+    else:
+        length_menu = default_length_menu
+
+    # Set label as "All" it display length is -1
+    length_menu_label = [str("All") if i == -1 else i for i in length_menu]
+
     return template.render(title=caption or "Table",
                            caption=caption,
                            table_headers=table_headers,
-                           table_items=table_items)
+                           table_items=table_items,
+                           length_menu=length_menu,
+                           length_menu_label=length_menu_label,
+                           display_length=display_length)
 
 
 def freeze_js(html):

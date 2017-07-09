@@ -11,7 +11,11 @@ from csvtotable import convert
 @click.option("-d", "--delimiter", type=str, default=",", help="CSV delimiter")
 @click.option("-q", "--quotechar", type=str, default="|",
               help="String used to quote fields containing special characters")
-def cli(input_file, output_file, caption, delimiter, quotechar):
+@click.option("-dl", "--display-length", type=int, default=-1,
+              help=("Number of rows to show by default. "
+                    "Defaults to -1 (show all rows)"))
+def cli(input_file, output_file, caption, delimiter, quotechar,
+        display_length):
     """
     CSVtoTable commandline utility.
     """
@@ -27,7 +31,8 @@ def cli(input_file, output_file, caption, delimiter, quotechar):
 
     # Convert CSV file
     convert.convert(input_file, output_file, caption=caption,
-                    delimiter=delimiter, quotechar=quotechar)
+                    delimiter=delimiter, quotechar=quotechar,
+                    display_length=display_length)
 
     click.secho("File converted successfully: {}".format(
         output_file), fg="green")

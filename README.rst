@@ -36,9 +36,10 @@ Options
 
 ::
 
-    -c, --caption       Table caption
-    -d, --delimiter     CSV delimiter. Defaults to ','
-    -q, --quotechar     Quote chracter. Defaults to '|'
+    -c,  --caption          Table caption
+    -d,  --delimiter        CSV delimiter. Defaults to ','
+    -q,  --quotechar        Quote chracter. Defaults to '|'
+    -dl, --display-length   Number of rows to show by default. Defaults to -1 (show all rows)
 
 .. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html
 .. _sample csv: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv

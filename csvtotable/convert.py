@@ -77,7 +77,7 @@ def freeze_js(html):
         return html
 
     # Reverse regex matches to replace match string with respective JS content
-    for match in reversed(matches):
+    for match in reversed(tuple(matches)):
         # JS file name
         file_name = match.group(1)
         file_path = os.path.join(js_files_path, file_name)

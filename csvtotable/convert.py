@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 import re
 import os
 import six
+import pandas as pd
+from IPython.display import display,HTML
 import logging
 from io import open
 import unicodecsv as csv
@@ -15,9 +17,9 @@ templates_dir = os.path.join(package_path, "templates")
 # Initialize Jinja 2 env
 env = Environment(
     loader=FileSystemLoader(templates_dir),
-    autoescape=select_autoescape(["html", "xml", "j2"])
+    autoescape=select_autoescape(["html", "xml"])
 )
-template = env.get_template("template.j2")
+template = env.get_template("template.html")
 
 # Regex to match src property in script tags
 js_src_pattern = re.compile(r'<script.*?src=\"(.*?)\".*?<\/script>',
@@ -33,62 +35,28 @@ def convert(input_file_name, output_file_name, **kwargs):
     caption = kwargs["caption"] or ""
     delimiter = kwargs["delimiter"] or ","
     quotechar = kwargs["quotechar"] or "|"
-    display_length = kwargs["display_length"]
 
     if six.PY2:
         delimiter = delimiter.encode("utf-8")
         quotechar = quotechar.encode("utf-8")
 
-    # Read CSV and form a header and rows list
-    with open(input_file_name, "rb") as input_file:
-        reader = csv.reader(input_file, encoding="utf-8", delimiter=delimiter,
-                            quotechar=quotechar)
-        # Read header from first line
-        csv_headers = next(reader)
-        csv_rows = [row for row in reader]
+    output_file = open(output_file_name, "w", encoding="utf-8")
 
-    # Template optional params
-    options = {
-        "caption": caption,
-        "display_length": display_length
-    }
+    # Read CSV in a dataframe
+    content = pd.read_csv(input_file_name,sep=delimiter,quotechar = quotechar)
 
-    # Render csv to HTML
-    html = render_template(csv_headers, csv_rows, **options)
-
+    # Add caption to the dataframe 
+    html = content.style.set_caption(caption).render()
+    
     # Freeze all JS files in template
     js_freezed_html = freeze_js(html)
 
     # Write to output
-    with open(output_file_name, "w", encoding="utf-8") as output_file:
-        output_file.write(js_freezed_html)
+    output_file.write(js_freezed_html)
 
+    # Close the files
+    output_file.close()
 
-def render_template(table_headers, table_items, **options):
-    """
-    Render Jinja2 template
-    """
-    caption = options["caption"] or "Table"
-    display_length = options["display_length"] or -1
-    default_length_menu = [-1, 10, 25, 50]
-
-    # Add display length to the default display length menu
-    length_menu = []
-    if display_length != -1:
-        length_menu = sorted(default_length_menu + [display_length])
-    else:
-        length_menu = default_length_menu
-
-    # Set label as "All" it display length is -1
-    length_menu_label = [str("All") if i == -1 else i for i in length_menu]
-
-    return template.render(title=caption or "Table",
-                           caption=caption,
-                           table_headers=table_headers,
-                           table_items=table_items,
-                           length_menu=length_menu,
-                           length_menu_label=length_menu_label,
-                           display_length=display_length)
 
 
 def freeze_js(html):
@@ -101,16 +69,17 @@ def freeze_js(html):
         return html
 
     # Reverse regex matches to replace match string with respective JS content
-    for match in reversed(tuple(matches)):
+    reversed_matches = reversed([m for m in matches])
+    for match in reversed_matches:
         # JS file name
         file_name = match.group(1)
         file_path = os.path.join(js_files_path, file_name)
 
         with open(file_path, "r", encoding="utf-8") as f:
             file_content = f.read()
-        # Replace matched string with inline JS
-        fmt = '<script type="text/javascript">{}</script>'
-        js_content = fmt.format(file_content)
-        html = html[:match.start()] + js_content + html[match.end():]
+            # Replace matched string with inline JS
+            js_content = '<script type="text/javascript">{}</script>'.format(
+                file_content)
+            html = html[:match.start()] + js_content + html[match.end():]
 
     return html

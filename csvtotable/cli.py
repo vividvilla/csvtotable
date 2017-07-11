@@ -33,7 +33,7 @@ def cli(input_file, output_file, caption, delimiter, quotechar,
 
     # Convert CSV file
     convert.convert(input_file, output_file, caption=caption,
-                    delimiter=delimiter, quotechar=quotechar,
+                    delimiter=str(delimiter), quotechar=str(quotechar),
                     display_length=display_length)
 
     click.secho("File converted successfully: {}".format(

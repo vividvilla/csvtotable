@@ -5,7 +5,7 @@ CSVtoTable
    :alt: Codacy Badge
    :target: https://www.codacy.com/app/vividvilla/csvtotable?utm_source=github.com&utm_medium=referral&utm_content=vividvilla/csvtotable&utm_campaign=badger
 
-Simple command-line utility to convert CSV files to searchable and
+Simple command-line utility to convert csv, xls, xlsx, ods files to searchable and
 sortable HTML table.
 
 Demo

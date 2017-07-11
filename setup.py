@@ -32,7 +32,8 @@ setup(
         "Topic :: Software Development :: Libraries"
     ],
     install_requires=["click >= 6.7", "jinja2 >= 2.9.6",
-                      "unicodecsv >= 0.14.1", "six >= 1.10.0"],
+                      "pyexcel >= 0.5.0", "six >= 1.10.0",
+                      "pyexcel-xls >= 0.4.0", "pyexcel-odsr >= 0.4.0"],
     entry_points={
         "console_scripts": [
             "csvtotable = csvtotable.cli:cli",

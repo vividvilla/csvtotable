@@ -1,6 +1,10 @@
 CSVtoTable
 ==========
 
+.. image:: https://api.codacy.com/project/badge/Grade/b31a7e5d6bba4b5d9331ba05b04a12ab
+   :alt: Codacy Badge
+   :target: https://www.codacy.com/app/vividvilla/csvtotable?utm_source=github.com&utm_medium=referral&utm_content=vividvilla/csvtotable&utm_campaign=badger
+
 Simple command-line utility to convert CSV files to searchable and
 sortable HTML table.
 

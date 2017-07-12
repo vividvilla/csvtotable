@@ -2,8 +2,13 @@ from __future__ import unicode_literals
 import re
 import os
 import six
+import uuid
+import time
 import logging
+import tempfile
+import webbrowser
 from io import open
+
 import unicodecsv as csv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -65,9 +70,26 @@ def save(file_name, content):
         return output_file.name
 
 
-    # Write to output
-    with open(output_file_name, "w", encoding="utf-8") as output_file:
-        output_file.write(js_freezed_html)
+def serve(content):
+    """Write content to a temp file and serve it in browser"""
+    temp_folder = tempfile.gettempdir()
+    temp_file_name = tempfile.gettempprefix() + str(uuid.uuid4()) + ".html"
+    # Generate a file path with a random name in temporary dir
+    temp_file_path = os.path.join(temp_folder, temp_file_name)
+
+    # save content to temp file
+    save(temp_file_path, content)
+
+    # Open templfile in a browser
+    webbrowser.open("file://{}".format(temp_file_path))
+
+    # Block the thread while content is served
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        # cleanup the temp file
+        os.remove(temp_file_path)
 
 
 def render_template(table_headers, table_items, **options):

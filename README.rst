@@ -31,6 +31,12 @@ Convert ``data.csv`` file to ``data.html`` file
 
     csvtotable data.csv data.html
 
+Open output file in a web browser instead of writing to a file
+
+::
+
+    csvtotable data.csv --serve
+
 Options
 -------
 
@@ -41,6 +47,7 @@ Options
     -q,  --quotechar        Quote chracter. Defaults to '|'
     -dl, --display-length   Number of rows to show by default. Defaults to -1 (show all rows)
     -o,  --overwrite        Overwrite the output file if exists. Defaults to false.
+    -s,  --serve            Open html output in a web browser.
 
 .. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html
 .. _sample csv: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv

@@ -2,19 +2,19 @@
 
 from setuptools import setup
 
-_version = "1.1.1"
+_version = "1.0"
 
 setup(
-    name="csvtotable",
+    name="exceltotable",
     version=_version,
-    description="Simple commandline utility to convert CSV files"
+    description="Simple commandline utility to convert excel files"
     "to searchable and sortable HTML table.",
     author="Vivek R",
     author_email="vividvilla@gmail.com",
-    url="https://github.com/vividvilla/csvtotable",
-    packages=["csvtotable"],
+    url="https://github.com/pyexcel/exceltotable",
+    packages=["exceltotable"],
     include_package_data=True,
-    download_url="https://github.com/vividvilla/csvtotable/archive/{}.tar.gz"
+    download_url="https://github.com/pyexcel/exceltotable/archive/{}.tar.gz"
         .format(_version),
     license="MIT",
     classifiers=[
@@ -36,7 +36,7 @@ setup(
                       "pyexcel-xls >= 0.4.0", "pyexcel-odsr >= 0.4.0"],
     entry_points={
         "console_scripts": [
-            "csvtotable = csvtotable.cli:cli",
+            "exceltotable = csvtotable.cli:cli",
             ]
     }
 )

@@ -1,4 +1,4 @@
-CSVtoTable
+ExceltoTable
 ==========
 
 .. image:: https://api.codacy.com/project/badge/Grade/b31a7e5d6bba4b5d9331ba05b04a12ab

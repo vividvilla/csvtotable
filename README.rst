@@ -53,5 +53,5 @@ Options
     -o,  --overwrite        Overwrite the output file if exists. Defaults to false.
     -s,  --serve            Open html output in a web browser.
 
-.. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html
+.. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/1.1.2/sample/goog.html
 .. _sample csv: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv

@@ -52,11 +52,13 @@ def cli(input_file, output_file, caption, delimiter, quotechar,
             return True
 
     # Convert CSV file
-    convert.convert(input_file, output_file, caption=caption,
+    content = convert.convert(input_file, caption=caption,
                     delimiter=delimiter, quotechar=quotechar,
                     display_length=display_length)
+
         if not overwrite and not prompt_overwrite(output_file):
             raise click.Abort()
 
+        convert.save(output_file, content)
     click.secho("File converted successfully: {}".format(
         output_file), fg="green")

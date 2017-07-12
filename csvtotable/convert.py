@@ -26,10 +26,8 @@ js_src_pattern = re.compile(r'<script.*?src=\"(.*?)\".*?<\/script>',
 js_files_path = os.path.join(package_path, templates_dir)
 
 
-def convert(input_file_name, output_file_name, **kwargs):
-    """
-    Convert CSV file to HTML table
-    """
+def convert(input_file_name, **kwargs):
+    """Convert CSV file to HTML table"""
     caption = kwargs["caption"] or ""
     delimiter = kwargs["delimiter"] or ","
     quotechar = kwargs["quotechar"] or "|"
@@ -57,7 +55,15 @@ def convert(input_file_name, output_file_name, **kwargs):
     html = render_template(csv_headers, csv_rows, **options)
 
     # Freeze all JS files in template
-    js_freezed_html = freeze_js(html)
+    return freeze_js(html)
+
+
+def save(file_name, content):
+    """Save content to a file"""
+    with open(file_name, "w", encoding="utf-8") as output_file:
+        output_file.write(content)
+        return output_file.name
+
 
     # Write to output
     with open(output_file_name, "w", encoding="utf-8") as output_file:

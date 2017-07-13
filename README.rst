@@ -49,7 +49,7 @@ Options
 
     -c,  --caption          Table caption
     -d,  --delimiter        CSV delimiter. Defaults to ','
-    -q,  --quotechar        Quote chracter. Defaults to '|'
+    -q,  --quotechar        Quote chracter. Defaults to '"'
     -dl, --display-length   Number of rows to show by default. Defaults to -1 (show all rows)
     -o,  --overwrite        Overwrite the output file if exists. Defaults to false.
     -s,  --serve            Open html output in a web browser.

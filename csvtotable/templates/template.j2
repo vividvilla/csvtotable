@@ -5,38 +5,19 @@
 </head>
 <body>
 	<table id="table">
-		{% if caption %}
+		{%- if caption %}
 		<caption>{{ caption }}</caption>
-		{% endif %}
-		<thead>
-			<tr>
-				{% for header in table_headers -%}
-				<th>{{ header }}</th>
-				{%- endfor %}
-			</tr>
-		</thead>
-
-		<tbody>
-			{% for row in table_items -%}
-			<tr>
-				{% for column in row -%}
-				<td>{{ column }}</td>
-				{%- endfor %}
-			</tr>
-			{%- endfor %}
-		</tbody>
+		{%- endif %}
 	</table>
 
 	<script src="js/jquery.min.js" type="text/javascript"></script>
 	<script src="js/jquery.dataTables.min.js" type="text/javascript"></script>
+	{%- if virtual_scroll %}
+	<script src="js/dataTables.scroller.min.js" type="text/javascript"></script>
+	{%- endif %}
 	<script>
 		$(document).ready(function() {
-			$("#table").DataTable({
-				"lengthMenu": [{{ length_menu }}, {{ length_menu_label | safe }}],
-				"iDisplayLength": {{ display_length }},
-				"sScrollX": "100%",
-				"sScrollXInner": "100%"
-			});
+			$("#table").DataTable({{ datatable_options | safe }});
 		});
 	</script>
 	<style>

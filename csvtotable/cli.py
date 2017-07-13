@@ -8,7 +8,7 @@ from csvtotable import convert
 def prompt_overwrite(file_name):
     # Skip if file doesn't exist
     if not os.path.exists(file_name):
-        return
+        return True
 
     # Prompt for file overwrite if outfile already exists
     fmt = "File ({}) already exists. Do you want to overwrite? (y/n): "

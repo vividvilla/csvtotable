@@ -20,7 +20,7 @@ Installation
 
 ::
 
-    pip install csvtotable
+    pip install --upgrade csvtotable
 
 Get started
 -----------

@@ -63,6 +63,6 @@ Credits
 -------
 `Datatables`_
 
-.. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/1.1.2/sample/goog.html
+.. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/2.0.0/sample/goog.html
 .. _sample csv: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv
 .. _Datatables: https://datatables.net

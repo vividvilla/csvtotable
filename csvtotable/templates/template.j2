@@ -33,7 +33,9 @@
 		$(document).ready(function() {
 			$("#table").DataTable({
 				"lengthMenu": [{{ length_menu }}, {{ length_menu_label | safe }}],
-				"iDisplayLength": {{ display_length }}
+				"iDisplayLength": {{ display_length }},
+				"sScrollX": "100%",
+				"sScrollXInner": "100%"
 			});
 		});
 	</script>
@@ -45,13 +47,13 @@
 		}
 
 		#table_wrapper {
-			max-width: 1024px;
-			margin: 40px auto;
+			margin: 20px 40px;
 		}
 
 		table tr th,
 		table tr td {
 			text-align: left;
+			white-space: nowrap;
 		}
 
 		#table_wrapper .dataTables_length,
@@ -91,10 +93,9 @@
 		}
 
 		#table_wrapper .dataTables_paginate a {
-			/*border: 1px solid #039;*/
-    	padding: 3px 6px;
-    	margin: 0 5px;
-    	cursor: pointer;
+			padding: 3px 6px;
+			margin: 0 5px;
+			cursor: pointer;
 		}
 
 		#table_wrapper .dataTables_paginate a.current {
@@ -126,37 +127,37 @@
 			position: relative;
 		}
 
-		#table_wrapper table th.sorting,
-		#table_wrapper table th.sorting_asc,
-		#table_wrapper table th.sorting_desc {
-			padding-right: 18px;
+		#table_wrapper .dataTables_scrollHead th.sorting,
+		#table_wrapper .dataTables_scrollHead th.sorting_asc,
+		#table_wrapper .dataTables_scrollHead th.sorting_desc {
 			position: relative;
 			cursor: pointer;
 		}
 
-		#table_wrapper table th.sorting:before,
-		#table_wrapper table th.sorting_asc:before,
-		#table_wrapper table th.sorting:after,
-		#table_wrapper table th.sorting_desc:after {
+		#table_wrapper .dataTables_scrollHead th.sorting:before,
+		#table_wrapper .dataTables_scrollHead th.sorting_asc:before,
+		#table_wrapper .dataTables_scrollHead th.sorting:after,
+		#table_wrapper .dataTables_scrollHead th.sorting_desc:after {
 			border: 4px solid transparent;
-			content: "";
-			display: block;
-			height: 0;
-			right: 5px;
-			top: 50%;
 			position: absolute;
+			display: block;
+			content: "";
+			height: 0;
+			right: 8px;
+			top: 50%;
 			width: 0;
+			opacity: 0.4;
 		}
 
-		#table_wrapper table th.sorting:before,
-		#table_wrapper table th.sorting_asc:before {
-			border-bottom-color: #666;
+		#table_wrapper .dataTables_scrollHead th.sorting:before,
+		#table_wrapper .dataTables_scrollHead th.sorting_asc:before {
+			border-bottom-color: #669;
 			margin-top: -9px;
 		}
 
-		#table_wrapper table th.sorting:after,
-		#table_wrapper table th.sorting_desc:after {
-			border-top-color: #666;
+		#table_wrapper .dataTables_scrollHead th.sorting:after,
+		#table_wrapper .dataTables_scrollHead th.sorting_desc:after {
+			border-top-color: #669;
 			margin-top: 1px;
 		}
 

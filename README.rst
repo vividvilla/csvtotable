@@ -8,6 +8,8 @@ Excel2Table
 Simple command-line utility to convert csv, xls, xlsx, ods files to searchable and
 sortable HTML table. Supports large datasets and horizontal scrolling for large number of columns.
 
+It is a variant of `csvtotable <https://github.com/vividvilla/csvtotable>`_.
+
 Demo
 ----
 
@@ -49,6 +51,7 @@ Options
 
     -c,  --caption          Table caption
     -d,  --delimiter        CSV delimiter. Defaults to ','
+	-e,  --encoding         CSV encoding. Defaults to 'utf-8'.
     -q,  --quotechar        Quote chracter. Defaults to '"'
     -dl, --display-length   Number of rows to show by default. Defaults to -1 (show all rows)
     -o,  --overwrite        Overwrite the output file if exists. Defaults to false.

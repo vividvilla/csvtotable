@@ -1,7 +1,7 @@
 import os
 import click
 
-from csvtotable import convert
+from excel2table import convert
 
 
 # Prompt for file overwrite
@@ -29,6 +29,8 @@ def prompt_overwrite(file_name):
 @click.argument("output_file", type=click.Path(), required=False)
 @click.option("-c", "--caption", type=str, help="Table caption")
 @click.option("-d", "--delimiter", type=str, default=",", help="CSV delimiter")
+@click.option("-e", "--encoding", type=str, default="utf-8",
+              help="CSV encoding")
 @click.option("-q", "--quotechar", type=str, default='"',
               help="String used to quote fields containing special characters")
 @click.option("-dl", "--display-length", type=int, default=-1,
@@ -51,7 +53,7 @@ def cli(*args, **kwargs):
     CSVtoTable commandline utility.
     """
     # Convert CSV file
-    content = convert.convert(kwargs["input_file"], **kwargs)
+    content = convert.convert(kwargs.pop("input_file"), **kwargs)
 
     # Serve the temporary file in browser.
     if kwargs["serve"]:

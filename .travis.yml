@@ -1,0 +1,26 @@
+sudo: false
+language: python
+notifications:
+  email: false
+python:
+  - pypy
+  - 3.6
+  - 3.5
+  - 3.4
+  - 3.3
+  - 2.7
+before_install:
+  - cd $HOME
+  - "if [[ $TRAVIS_PYTHON_VERSION == 'pypy' ]]; then deactivate && wget https://bitbucket.org/squeaky/portable-pypy/downloads/pypy-5.7.1-linux_x86_64-portable.tar.bz2 -O - | tar -jxf - && echo 'Setting up aliases...' && ln -s pypy-5.7.1-linux_x86_64-portable pypy2-latest && export PATH=$HOME/pypy2-latest/bin/:$PATH && virtualenv --no-site-packages --python ~/pypy2-latest/bin/pypy pypy2-env && echo 'Creating custom env...' && source pypy2-env/bin/activate && python -V; fi"
+  - cd -
+  - if [[ $TRAVIS_PYTHON_VERSION == "2.6" ]]; then pip install flake8==2.6.2; fi
+  - if [[ -f min_requirements.txt && "$MINREQ" -eq 1 ]]; then
+      mv min_requirements.txt requirements.txt ;
+    fi
+  - test ! -f rnd_requirements.txt || pip install --no-deps -r rnd_requirements.txt
+  - test ! -f rnd_requirements.txt || pip install -r rnd_requirements.txt ;
+  - pip install -r tests/requirements.txt
+script:
+  - make test
+after_success:
+  codecov

@@ -9,8 +9,7 @@ import logging
 import tempfile
 import webbrowser
 from io import open
-
-import unicodecsv as csv
+import pyexcel as p
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logging.basicConfig()
@@ -33,36 +32,32 @@ js_src_pattern = re.compile(r'<script.*?src=\"(.*?)\".*?<\/script>',
 js_files_path = os.path.join(package_path, templates_dir)
 
 
-def convert(input_file_name, **kwargs):
-    """Convert CSV file to HTML table"""
-    delimiter = kwargs["delimiter"] or ","
-    quotechar = kwargs["quotechar"] or "|"
+def convert(input_file_name, delimiter=',', quotechar='|',
+            encoding='utf-8', **kwargs):
+    """
+    Convert excel file to HTML table
+    """
 
     if six.PY2:
-        delimiter = delimiter.encode("utf-8")
-        quotechar = quotechar.encode("utf-8")
+        delimiter = delimiter.encode('utf-8')
+        quotechar = quotechar.encode('utf-8')
 
     # Read CSV and form a header and rows list
-    with open(input_file_name, "rb") as input_file:
-        reader = csv.reader(input_file,
-                            encoding="utf-8",
-                            delimiter=delimiter,
-                            quotechar=quotechar)
+    excel_sheet = p.get_sheet(file_name=input_file_name,
+                              name_columns_by_row=0, encoding=encoding,
+                              delimiter=str(delimiter), quotechar=quotechar)
+    csv_headers = []
+    if not kwargs.get("no_header"):
+        # Read header from first line
+        csv_headers = excel_sheet.colnames
 
-        csv_headers = []
-        if not kwargs.get("no_header"):
-            # Read header from first line
-            csv_headers = next(reader)
-
-        csv_rows = [row for row in reader]
-
-        # Set default column name if header is not present
-        if not csv_headers and len(csv_rows) > 0:
-            end = len(csv_rows[0]) + 1
-            csv_headers = ["Column {}".format(n) for n in range(1, end)]
+    # Set default column name if header is not present
+    if not csv_headers and len(excel_sheet.number_of_rows()) > 1:
+        csv_headers = ["Column {}".format((n+1))
+                       for n in range(len(excel_sheet.number_of_columns()))]
 
     # Render csv to HTML
-    html = render_template(csv_headers, csv_rows, **kwargs)
+    html = render_template(csv_headers, excel_sheet.array[1:], **kwargs)
 
     # Freeze all JS files in template
     return freeze_js(html)
@@ -136,7 +131,7 @@ def render_template(table_headers, table_items, **options):
 
         fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
                " You can set custom row limit by setting flag -vs, --virtual-scroll."
-               " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
+               " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")  # flake8: noqa
         logger.warn(fmt.format(limit=virtual_scroll_limit))
 
         if not is_paging:

@@ -1,0 +1,6 @@
+click
+jinja2
+pyexcel
+pyexcel-xls
+pyexcel-odsr
+six

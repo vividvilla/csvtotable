@@ -5,16 +5,16 @@ from setuptools import setup
 _version = "2.0.0"
 
 setup(
-    name="csvtotable",
+    name="excel2table",
     version=_version,
-    description="Simple commandline utility to convert CSV files"
+    description="Simple commandline utility to convert excel files"
     "to searchable and sortable HTML table.",
     author="Vivek R",
     author_email="vividvilla@gmail.com",
-    url="https://github.com/vividvilla/csvtotable",
-    packages=["csvtotable"],
+    url="https://github.com/pyexcel/exceltotable",
+    packages=["excel2table"],
     include_package_data=True,
-    download_url="https://github.com/vividvilla/csvtotable/archive/{}.tar.gz"
+    download_url="https://github.com/pyexcel/exceltotable/archive/{}.tar.gz"
         .format(_version),
     license="MIT",
     classifiers=[
@@ -32,10 +32,11 @@ setup(
         "Topic :: Software Development :: Libraries"
     ],
     install_requires=["click >= 6.7", "jinja2 >= 2.9.6",
-                      "unicodecsv >= 0.14.1", "six >= 1.10.0"],
+                      "pyexcel >= 0.5.0", "six >= 1.10.0",
+                      "pyexcel-xls >= 0.4.0", "pyexcel-odsr >= 0.4.0"],
     entry_points={
         "console_scripts": [
-            "csvtotable = csvtotable.cli:cli",
+            "excel2table = excel2table.cli:cli",
             ]
     }
 )

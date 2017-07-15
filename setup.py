@@ -11,6 +11,8 @@ setup(
     "to searchable and sortable HTML table.",
     author="Vivek R",
     author_email="vividvilla@gmail.com",
+    maintainer="C.W.",
+    maintainer_email="wangc_2011@hotmail.com",
     url="https://github.com/pyexcel/exceltotable",
     packages=["excel2table"],
     include_package_data=True,

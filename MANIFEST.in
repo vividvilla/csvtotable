@@ -1,3 +1,3 @@
-recursive-include csvtotable *.j2 *.js *.py
+recursive-include excel2table *.j2 *.js *.py
 include LICENSE
 include README.rst

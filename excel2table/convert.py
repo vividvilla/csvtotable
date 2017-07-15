@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import re
 import os
+import six
 import uuid
 import json
 import time
@@ -31,16 +32,20 @@ js_src_pattern = re.compile(r'<script.*?src=\"(.*?)\".*?<\/script>',
 js_files_path = os.path.join(package_path, templates_dir)
 
 
-def convert(input_file_name, output_file_name,
-            caption="", display_length=0, **kwargs):
+def convert(input_file_name, delimiter=',', quotechar='|',
+            encoding='utf-8', **kwargs):
     """
     Convert excel file to HTML table
     """
 
+    if six.PY2:
+        delimiter = delimiter.encode('utf-8')
+        quotechar = quotechar.encode('utf-8')
+
     # Read CSV and form a header and rows list
     excel_sheet = p.get_sheet(file_name=input_file_name,
-                              name_columns_by_row=0,
-                              **kwargs)
+                              name_columns_by_row=0, encoding=encoding,
+                              delimiter=str(delimiter), quotechar=quotechar)
     csv_headers = []
     if not kwargs.get("no_header"):
         # Read header from first line

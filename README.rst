@@ -1,4 +1,4 @@
-ExceltoTable
+Excel2Table
 ==========
 
 .. image:: https://api.codacy.com/project/badge/Grade/b31a7e5d6bba4b5d9331ba05b04a12ab
@@ -20,7 +20,7 @@ Installation
 
 ::
 
-    pip install --upgrade csvtotable
+    pip install --upgrade excel2table
 
 
 Get started
@@ -28,19 +28,19 @@ Get started
 
 ::
 
-    csvtotable --help
+    excel2table --help
 
-Convert ``data.csv`` file to ``data.html`` file
+Convert ``data.ods`` file to ``data.html`` file
 
 ::
 
-    csvtotable data.csv data.html
+    excel2table data.ods data.html
 
 Open output file in a web browser instead of writing to a file
 
 ::
 
-    csvtotable data.csv --serve
+    excel2table data.ods --serve
 
 Options
 -------
@@ -64,7 +64,7 @@ Credits
 `Datatables`_
 
 
-.. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html
-.. _sample ods: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.ods
+.. _Here is a demo: https://github.com/pyexcel/excel2table/master/sample/goog.html
+.. _sample ods: https://github.com/pyexcel/excel2table/blob/master/sample/goog.ods
 .. _Datatables: https://datatables.net
 

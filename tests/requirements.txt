@@ -1,0 +1,5 @@
+nose
+codecov
+coverage
+flake8
+ordereddict;python_version<"2.7"

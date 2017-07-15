@@ -1,9 +1,12 @@
 Excel2Table
-==========
+============
 
-.. image:: https://api.codacy.com/project/badge/Grade/b31a7e5d6bba4b5d9331ba05b04a12ab
-   :alt: Codacy Badge
-   :target: https://www.codacy.com/app/vividvilla/csvtotable?utm_source=github.com&utm_medium=referral&utm_content=vividvilla/csvtotable&utm_campaign=badger
+.. image:: https://api.travis-ci.org/pyexcel/excel2table.svg?branch=master
+   :target: http://travis-ci.org/pyexcel/excel2table
+
+.. image:: https://codecov.io/github/pyexcel/excel2table/coverage.png
+   :target: https://codecov.io/github/pyexcel/excel2table
+
 
 Simple command-line utility to convert csv, xls, xlsx, ods files to searchable and
 sortable HTML table. Supports large datasets and horizontal scrolling for large number of columns.

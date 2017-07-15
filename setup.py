@@ -5,14 +5,14 @@ from setuptools import setup
 _version = "2.0.0"
 
 setup(
-    name="exceltotable",
+    name="excel2table",
     version=_version,
     description="Simple commandline utility to convert excel files"
     "to searchable and sortable HTML table.",
     author="Vivek R",
     author_email="vividvilla@gmail.com",
     url="https://github.com/pyexcel/exceltotable",
-    packages=["csvtotable"],
+    packages=["excel2table"],
     include_package_data=True,
     download_url="https://github.com/pyexcel/exceltotable/archive/{}.tar.gz"
         .format(_version),
@@ -36,7 +36,7 @@ setup(
                       "pyexcel-xls >= 0.4.0", "pyexcel-odsr >= 0.4.0"],
     entry_points={
         "console_scripts": [
-            "exceltotable = csvtotable.cli:cli",
+            "excel2table = excel2table.cli:cli",
             ]
     }
 )

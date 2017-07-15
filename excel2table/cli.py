@@ -1,7 +1,7 @@
 import os
 import click
 
-from csvtotable import convert
+from excel2table import convert
 
 
 # Prompt for file overwrite

@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-_version = "1.0"
+_version = "2.0.0"
 
 setup(
     name="exceltotable",
@@ -12,7 +12,7 @@ setup(
     author="Vivek R",
     author_email="vividvilla@gmail.com",
     url="https://github.com/pyexcel/exceltotable",
-    packages=["exceltotable"],
+    packages=["csvtotable"],
     include_package_data=True,
     download_url="https://github.com/pyexcel/exceltotable/archive/{}.tar.gz"
         .format(_version),

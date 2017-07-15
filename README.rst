@@ -6,12 +6,12 @@ ExceltoTable
    :target: https://www.codacy.com/app/vividvilla/csvtotable?utm_source=github.com&utm_medium=referral&utm_content=vividvilla/csvtotable&utm_campaign=badger
 
 Simple command-line utility to convert csv, xls, xlsx, ods files to searchable and
-sortable HTML table.
+sortable HTML table. Supports large datasets and horizontal scrolling for large number of columns.
 
 Demo
 ----
 
-`Here is a demo`_ of `sample csv`_ file converted to HTML table.
+`Here is a demo`_ of `sample ods`_ file converted to HTML table.
 
 .. image:: https://raw.githubusercontent.com/vividvilla/csvtotable/master/sample/table.gif
 
@@ -20,7 +20,8 @@ Installation
 
 ::
 
-    pip install csvtotable
+    pip install --upgrade csvtotable
+
 
 Get started
 -----------
@@ -35,6 +36,12 @@ Convert ``data.csv`` file to ``data.html`` file
 
     csvtotable data.csv data.html
 
+Open output file in a web browser instead of writing to a file
+
+::
+
+    csvtotable data.csv --serve
+
 Options
 -------
 
@@ -42,9 +49,22 @@ Options
 
     -c,  --caption          Table caption
     -d,  --delimiter        CSV delimiter. Defaults to ','
-    -q,  --quotechar        Quote chracter. Defaults to '|'
+    -q,  --quotechar        Quote chracter. Defaults to '"'
     -dl, --display-length   Number of rows to show by default. Defaults to -1 (show all rows)
     -o,  --overwrite        Overwrite the output file if exists. Defaults to false.
+    -s,  --serve            Open html output in a web browser.
+    -h,  --height           Table height in px or in %. Default is 75% of the page.
+    -p,  --pagination       Enable/disable pagination. Enabled by default.
+    -vs, --virtual-scroll   Number of rows after which virtual scroll is enabled. Default is set to 1000 rows.
+                            Set it to -1 to disable and 0 to always enable.
+    -nh, --no-header        Show default headers instead of picking first row as header. Disabled by default.
+
+Credits
+-------
+`Datatables`_
+
 
 .. _Here is a demo: https://cdn.rawgit.com/vividvilla/csvtotable/master/sample/goog.html
-.. _sample csv: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.csv
+.. _sample ods: https://github.com/vividvilla/csvtotable/blob/master/sample/goog.ods
+.. _Datatables: https://datatables.net
+

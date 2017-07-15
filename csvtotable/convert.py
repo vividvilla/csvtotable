@@ -1,12 +1,18 @@
 from __future__ import unicode_literals
 import re
 import os
+import uuid
+import json
+import time
 import logging
+import tempfile
+import webbrowser
 from io import open
 import pyexcel as p
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-logger = logging.getLogger(__name__)
+logging.basicConfig()
+logger = logging.getLogger(__package__)
 
 package_path = os.path.dirname(os.path.abspath(__file__))
 templates_dir = os.path.join(package_path, "templates")
@@ -35,50 +41,134 @@ def convert(input_file_name, output_file_name,
     excel_sheet = p.get_sheet(file_name=input_file_name,
                               name_columns_by_row=0,
                               **kwargs)
+    csv_headers = []
+    if not kwargs.get("no_header"):
+        # Read header from first line
+        csv_headers = excel_sheet.colnames
 
-    # Template optional params
-    options = {
-        "caption": caption,
-        "display_length": display_length
-    }
+    # Set default column name if header is not present
+    if not csv_headers and len(excel_sheet.number_of_rows()) > 1:
+        csv_headers = ["Column {}".format((n+1))
+                       for n in range(len(excel_sheet.number_of_columns()))]
 
     # Render csv to HTML
-    html = render_template(excel_sheet.colnames, excel_sheet.array[1:],
-                           **options)
+    html = render_template(csv_headers, excel_sheet.array[1:], **kwargs)
 
     # Freeze all JS files in template
-    js_freezed_html = freeze_js(html)
+    return freeze_js(html)
 
-    # Write to output
-    with open(output_file_name, "w", encoding="utf-8") as output_file:
-        output_file.write(js_freezed_html)
+
+def save(file_name, content):
+    """Save content to a file"""
+    with open(file_name, "w", encoding="utf-8") as output_file:
+        output_file.write(content)
+        return output_file.name
+
+
+def serve(content):
+    """Write content to a temp file and serve it in browser"""
+    temp_folder = tempfile.gettempdir()
+    temp_file_name = tempfile.gettempprefix() + str(uuid.uuid4()) + ".html"
+    # Generate a file path with a random name in temporary dir
+    temp_file_path = os.path.join(temp_folder, temp_file_name)
+
+    # save content to temp file
+    save(temp_file_path, content)
+
+    # Open templfile in a browser
+    webbrowser.open("file://{}".format(temp_file_path))
+
+    # Block the thread while content is served
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        # cleanup the temp file
+        os.remove(temp_file_path)
 
 
 def render_template(table_headers, table_items, **options):
     """
     Render Jinja2 template
     """
-    caption = options["caption"] or "Table"
-    display_length = options["display_length"] or -1
+    caption = options.get("caption") or "Table"
+    display_length = options.get("display_length") or -1
+    height = options.get("height") or "70vh"
     default_length_menu = [-1, 10, 25, 50]
+    pagination = options.get("pagination")
+    virtual_scroll_limit = options.get("virtual_scroll")
 
-    # Add display length to the default display length menu
-    length_menu = []
-    if display_length != -1:
-        length_menu = sorted(default_length_menu + [display_length])
+    # Change % to vh
+    height = height.replace("%", "vh")
+
+    # Header columns
+    columns = []
+    for header in table_headers:
+        columns.append({"title": header})
+
+    # Data table options
+    datatable_options = {
+        "columns": columns,
+        "data": table_items,
+        "iDisplayLength": display_length,
+        "sScrollX": "100%",
+        "sScrollXInner": "100%"
+    }
+
+    # Enable virtual scroll for rows bigger than 1000 rows
+    is_paging = pagination
+    virtual_scroll = False
+    scroll_y = height
+
+    if virtual_scroll_limit != -1 and len(table_items) > virtual_scroll_limit:
+        virtual_scroll = True
+        display_length = -1
+
+        fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
+               " You can set custom row limit by setting flag -vs, --virtual-scroll."
+               " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
+        logger.warn(fmt.format(limit=virtual_scroll_limit))
+
+        if not is_paging:
+            fmt = "\nPagination can not be disabled in virtual scroll mode."
+            logger.warn(fmt)
+
+        is_paging = True
+
+    if is_paging and not virtual_scroll:
+        # Add display length to the default display length menu
+        length_menu = []
+        if display_length != -1:
+            length_menu = sorted(default_length_menu + [display_length])
+        else:
+            length_menu = default_length_menu
+
+        # Set label as "All" it display length is -1
+        length_menu_label = [str("All") if i == -1 else i for i in length_menu]
+        datatable_options["lengthMenu"] = [length_menu, length_menu_label]
+        datatable_options["iDisplayLength"] = display_length
+
+    if is_paging:
+        datatable_options["paging"] = True
     else:
-        length_menu = default_length_menu
+        datatable_options["paging"] = False
 
-    # Set label as "All" it display length is -1
-    length_menu_label = [str("All") if i == -1 else i for i in length_menu]
+    if scroll_y:
+        datatable_options["scrollY"] = scroll_y
+
+    if virtual_scroll:
+        datatable_options["scroller"] = True
+        datatable_options["bPaginate"] = False
+        datatable_options["deferRender"] = True
+        datatable_options["bLengthChange"] = False
+
+    datatable_options_json = json.dumps(datatable_options,
+                                        separators=(",", ":"))
 
     return template.render(title=caption or "Table",
                            caption=caption,
-                           table_headers=table_headers,
-                           table_items=table_items,
-                           length_menu=length_menu,
-                           length_menu_label=length_menu_label,
-                           display_length=display_length)
+                           datatable_options=datatable_options_json,
+                           virtual_scroll=virtual_scroll)
 
 
 def freeze_js(html):

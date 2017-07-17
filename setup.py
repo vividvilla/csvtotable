@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-_version = "2.0.0"
+_version = "2.1.0"
 
 setup(
     name="csvtotable",

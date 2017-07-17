@@ -58,6 +58,9 @@ Options
     -vs, --virtual-scroll   Number of rows after which virtual scroll is enabled. Default is set to 1000 rows.
                             Set it to -1 to disable and 0 to always enable.
     -nh, --no-header        Show default headers instead of picking first row as header. Disabled by default.
+    -e,  --export           Enable filtered rows export options.
+    -eo, --export-options   Enable specific export options. By default shows all.
+                            For multiple options use -eo flag multiple times. For ex. -eo json -eo csv
 
 Credits
 -------

@@ -46,6 +46,11 @@ def prompt_overwrite(file_name):
                     "Set it to -1 to disable and 0 to always enable."))
 @click.option("-nh", "--no-header", default=False, is_flag=True,
               help="Disable displaying first row as headers.")
+@click.option("-e", "--export", default=True, is_flag=True,
+              help="Enable filtered rows export options.")
+@click.option("-eo", "--export-options", type=click.Choice(["copy", "csv", "json", "print"]),
+              multiple=True, help=("Enable specific export options. By default shows all."
+              "For multiple options use -eo flag multiple times. For ex. -eo json -eo csv"))
 def cli(*args, **kwargs):
     """
     CSVtoTable commandline utility.

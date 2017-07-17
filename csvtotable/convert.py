@@ -172,13 +172,24 @@ def render_template(table_headers, table_items, **options):
         datatable_options["deferRender"] = True
         datatable_options["bLengthChange"] = False
 
+    enable_export = options["export"]
+    if enable_export:
+        if options["export_options"]:
+            allowed = list(options["export_options"])
+        else:
+            allowed = ["copy", "csv", "json", "print"]
+
+        datatable_options["dom"] = "Bfrtip"
+        datatable_options["buttons"] = allowed
+
     datatable_options_json = json.dumps(datatable_options,
                                         separators=(",", ":"))
 
     return template.render(title=caption or "Table",
                            caption=caption,
                            datatable_options=datatable_options_json,
-                           virtual_scroll=virtual_scroll)
+                           virtual_scroll=virtual_scroll,
+                           enable_export=enable_export)
 
 
 def freeze_js(html):

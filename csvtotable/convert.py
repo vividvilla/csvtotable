@@ -54,7 +54,7 @@ def convert(input_file_name, **kwargs):
             # Read header from first line
             csv_headers = next(reader)
 
-        csv_rows = [row for row in reader]
+        csv_rows = [row for row in reader if row]
 
         # Set default column name if header is not present
         if not csv_headers and len(csv_rows) > 0:

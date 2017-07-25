@@ -130,9 +130,10 @@ def render_template(table_headers, table_items, **options):
     virtual_scroll = False
     scroll_y = height
 
-    if virtual_scroll_limit != -1 and len(table_items) > virtual_scroll_limit:
-        virtual_scroll = True
-        display_length = -1
+    if virtual_scroll_limit:
+        if virtual_scroll_limit != -1 and len(table_items) > virtual_scroll_limit:
+            virtual_scroll = True
+            display_length = -1
 
         fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
                " You can set custom row limit by setting flag -vs, --virtual-scroll."
@@ -172,7 +173,7 @@ def render_template(table_headers, table_items, **options):
         datatable_options["deferRender"] = True
         datatable_options["bLengthChange"] = False
 
-    enable_export = options["export"]
+    enable_export = options.get("export")
     if enable_export:
         if options["export_options"]:
             allowed = list(options["export_options"])

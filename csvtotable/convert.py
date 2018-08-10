@@ -42,30 +42,33 @@ def convert(input_file_name, **kwargs):
         delimiter = delimiter.encode("utf-8")
         quotechar = quotechar.encode("utf-8")
 
-    # Read CSV and form a header and rows list
-    with open(input_file_name, "rb") as input_file:
-        reader = csv.reader(input_file,
-                            encoding="utf-8",
-                            delimiter=delimiter,
-                            quotechar=quotechar)
-
-        csv_headers = []
-        if not kwargs.get("no_header"):
-            # Read header from first line
-            csv_headers = next(reader)
-
-        csv_rows = [row for row in reader if row]
-
-        # Set default column name if header is not present
-        if not csv_headers and len(csv_rows) > 0:
-            end = len(csv_rows[0]) + 1
-            csv_headers = ["Column {}".format(n) for n in range(1, end)]
+    headers, rows = read_file(input_file_name)
 
     # Render csv to HTML
     html = render_template(csv_headers, csv_rows, **kwargs)
 
     # Freeze all JS files in template
     return freeze_js(html)
+
+def read_file(input_file_name):
+    import pandas as pd
+    import numpy as np
+    suffix = os.path.splitext(input_file_name)[1]
+    if not suffix:
+        if six.PY2:
+            suffix = raw_input('please enter file type.(csv、excel):\t')
+        else:
+            suffix = input('please enter file type.(csv、excel):\t')
+    if 'csv' in suffix:
+        df = pd.read_csv(input_file_name)
+    else:
+        df = pd.read_excel(input_file_name)
+    headers = [i for i in df.columns]
+    rows = np.array(df).tolist()
+    if not headers and len(rows) > 0:
+        end = len(headers) + 1
+        headers = ["Column {}".format(n) for n in range(1, end)]
+    return headers, rows
 
 
 def save(file_name, content):

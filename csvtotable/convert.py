@@ -107,6 +107,7 @@ def render_template(table_headers, table_items, **options):
     default_length_menu = [-1, 10, 25, 50]
     pagination = options.get("pagination")
     virtual_scroll_limit = options.get("virtual_scroll")
+    preserve_sort = options.get("preserve_sort")
 
     # Change % to vh
     height = height.replace("%", "vh")
@@ -135,10 +136,10 @@ def render_template(table_headers, table_items, **options):
             virtual_scroll = True
             display_length = -1
 
-        fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
-               " You can set custom row limit by setting flag -vs, --virtual-scroll."
-               " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
-        logger.warn(fmt.format(limit=virtual_scroll_limit))
+            fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
+                   " You can set custom row limit by setting flag -vs, --virtual-scroll."
+                   " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
+            logger.warn(fmt.format(limit=virtual_scroll_limit))
 
         if not is_paging:
             fmt = "\nPagination can not be disabled in virtual scroll mode."
@@ -172,6 +173,9 @@ def render_template(table_headers, table_items, **options):
         datatable_options["bPaginate"] = False
         datatable_options["deferRender"] = True
         datatable_options["bLengthChange"] = False
+
+    if preserve_sort:
+        datatable_options["order"] = []
 
     enable_export = options.get("export")
     if enable_export:

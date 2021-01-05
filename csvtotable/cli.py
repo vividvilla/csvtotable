@@ -51,6 +51,9 @@ def prompt_overwrite(file_name):
 @click.option("-eo", "--export-options", type=click.Choice(["copy", "csv", "json", "print"]),
               multiple=True, help=("Enable specific export options. By default shows all. "
               "For multiple options use -eo flag multiple times. For ex. -eo json -eo csv"))
+@click.option("-ps", "--preserve-sort", default=False, is_flag=True,
+              help=("Preserve the default sorting order "
+              "(not using this flag will cause table to be sorted by first column)."))
 def cli(*args, **kwargs):
     """
     CSVtoTable commandline utility.

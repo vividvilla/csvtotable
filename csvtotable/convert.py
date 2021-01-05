@@ -107,7 +107,7 @@ def render_template(table_headers, table_items, **options):
     default_length_menu = [-1, 10, 25, 50]
     pagination = options.get("pagination")
     virtual_scroll_limit = options.get("virtual_scroll")
-    keep_orig_sort = options.get("keep_orig_sort")
+    preserve_sort = options.get("preserve_sort")
 
     # Change % to vh
     height = height.replace("%", "vh")
@@ -174,7 +174,7 @@ def render_template(table_headers, table_items, **options):
         datatable_options["deferRender"] = True
         datatable_options["bLengthChange"] = False
 
-    if keep_orig_sort:
+    if preserve_sort:
         datatable_options["order"] = []
 
     enable_export = options.get("export")

@@ -136,10 +136,10 @@ def render_template(table_headers, table_items, **options):
             virtual_scroll = True
             display_length = -1
 
-        fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
-               " You can set custom row limit by setting flag -vs, --virtual-scroll."
-               " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
-        logger.warn(fmt.format(limit=virtual_scroll_limit))
+            fmt = ("\nVirtual scroll is enabled since number of rows exceeds {limit}."
+                   " You can set custom row limit by setting flag -vs, --virtual-scroll."
+                   " Virtual scroll can be disabled by setting the value to -1 and set it to 0 to always enable.")
+            logger.warn(fmt.format(limit=virtual_scroll_limit))
 
         if not is_paging:
             fmt = "\nPagination can not be disabled in virtual scroll mode."

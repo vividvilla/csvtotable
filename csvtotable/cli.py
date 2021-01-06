@@ -48,7 +48,7 @@ def prompt_overwrite(file_name):
               help="Disable displaying first row as headers.")
 @click.option("-e", "--export", default=True, is_flag=True,
               help="Enable filtered rows export options.")
-@click.option("-eo", "--export-options", type=click.Choice(["copy", "csv", "json", "print"]),
+@click.option("-eo", "--export-options", type=click.Choice(["copy", "csv", "json", "print", "chart"]),
               multiple=True, help=("Enable specific export options. By default shows all. "
               "For multiple options use -eo flag multiple times. For ex. -eo json -eo csv"))
 @click.option("-ps", "--preserve-sort", default=False, is_flag=True,

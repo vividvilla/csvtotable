@@ -182,7 +182,7 @@ def render_template(table_headers, table_items, **options):
         if options["export_options"]:
             allowed = list(options["export_options"])
         else:
-            allowed = ["copy", "csv", "json", "print"]
+            allowed = ["copy", "csv", "json", "print", "chart"]
 
         datatable_options["dom"] = "Bfrtip"
         datatable_options["buttons"] = allowed

@@ -13,6 +13,8 @@ from io import open
 import unicodecsv as csv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from . import charts
+
 logging.basicConfig()
 logger = logging.getLogger(__package__)
 
@@ -61,8 +63,40 @@ def convert(input_file_name, **kwargs):
             end = len(csv_rows[0]) + 1
             csv_headers = ["Column {}".format(n) for n in range(1, end)]
 
+    # Process chart options
+    chart_configs = []
+    if kwargs.get("auto_charts"):
+        # Auto-detect and generate charts
+        chart_configs = charts.auto_detect_charts(csv_headers, csv_rows)
+        if chart_configs:
+            logger.info("Auto-generated {} chart(s)".format(len(chart_configs)))
+    elif kwargs.get("chart_type"):
+        # Parse user-specified chart options
+        try:
+            chart_configs = charts.parse_chart_options(
+                kwargs.get("chart_type"),
+                kwargs.get("chart_x", ()),
+                kwargs.get("chart_y", ()),
+                kwargs.get("chart_labels", ()),
+                kwargs.get("chart_values", ()),
+                kwargs.get("chart_title", ())
+            )
+        except Exception as e:
+            logger.error("Error parsing chart options: {}".format(str(e)))
+            chart_configs = []
+
+    # Generate chart data
+    chart_data = []
+    if chart_configs:
+        for config in chart_configs:
+            try:
+                chart_json = charts.generate_chart_data(csv_headers, csv_rows, config)
+                chart_data.append(chart_json)
+            except Exception as e:
+                logger.error("Error generating chart: {}".format(str(e)))
+
     # Render csv to HTML
-    html = render_template(csv_headers, csv_rows, **kwargs)
+    html = render_template(csv_headers, csv_rows, chart_data=chart_data, **kwargs)
 
     # Freeze all JS files in template
     return freeze_js(html)
@@ -190,11 +224,17 @@ def render_template(table_headers, table_items, **options):
     datatable_options_json = json.dumps(datatable_options,
                                         separators=(",", ":"))
 
+    # Prepare chart data for template
+    chart_data = options.get("chart_data", [])
+    chart_configs_json = json.dumps(chart_data, separators=(",", ":")) if chart_data else "[]"
+
     return template.render(title=caption or "Table",
                            caption=caption,
                            datatable_options=datatable_options_json,
                            virtual_scroll=virtual_scroll,
-                           enable_export=enable_export)
+                           enable_export=enable_export,
+                           has_charts=bool(chart_data),
+                           chart_configs=chart_configs_json)
 
 
 def freeze_js(html):

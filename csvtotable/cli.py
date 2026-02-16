@@ -54,6 +54,20 @@ def prompt_overwrite(file_name):
 @click.option("-ps", "--preserve-sort", default=False, is_flag=True,
               help=("Preserve the default sorting order "
               "(not using this flag will cause table to be sorted by first column)."))
+@click.option("-ch", "--chart", "chart_type", type=click.Choice(["bar", "line", "pie"]),
+              multiple=True, help="Add chart visualization. Can be used multiple times for multiple charts.")
+@click.option("-cx", "--chart-x", type=str, multiple=True,
+              help="X-axis column name for bar/line chart (use with --chart bar or --chart line)")
+@click.option("-cy", "--chart-y", type=str, multiple=True,
+              help="Y-axis column name(s) for bar/line chart, comma-separated for multiple series")
+@click.option("-cl", "--chart-labels", type=str, multiple=True,
+              help="Labels column name for pie chart (use with --chart pie)")
+@click.option("-cv", "--chart-values", type=str, multiple=True,
+              help="Values column name for pie chart (use with --chart pie)")
+@click.option("-ct", "--chart-title", type=str, multiple=True,
+              help="Title for the chart")
+@click.option("-ac", "--auto-charts", default=False, is_flag=True,
+              help="Automatically generate charts from data based on column types")
 def cli(*args, **kwargs):
     """
     CSVtoTable commandline utility.

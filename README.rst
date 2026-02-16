@@ -61,6 +61,48 @@ Options
     -e,  --export           Enable filtered rows export options.
     -eo, --export-options   Enable specific export options. By default shows all.
                             For multiple options use -eo flag multiple times. For ex. -eo json -eo csv
+    -ch, --chart            Add chart visualization (bar, line, or pie). Can be used multiple times.
+    -cx, --chart-x          X-axis column name for bar/line chart
+    -cy, --chart-y          Y-axis column name(s) for bar/line chart (comma-separated for multiple series)
+    -cl, --chart-labels     Labels column name for pie chart
+    -cv, --chart-values     Values column name for pie chart
+    -ct, --chart-title      Title for the chart
+    -ac, --auto-charts      Automatically generate charts based on data types
+
+Chart Examples
+--------------
+
+Generate a line chart showing trends over time
+
+::
+
+    csvtotable sales_data.csv sales.html --chart line --chart-x "Month" --chart-y "Revenue,Expenses" --chart-title "Monthly Financial Trends"
+
+Generate a bar chart comparing values
+
+::
+
+    csvtotable product_sales.csv products.html --chart bar --chart-x "Product" --chart-y "Units Sold" --chart-title "Sales by Product"
+
+Generate a pie chart showing distribution
+
+::
+
+    csvtotable market_share.csv market.html --chart pie --chart-labels "Company" --chart-values "Market Share" --chart-title "Market Share Distribution"
+
+Automatically detect and generate appropriate charts
+
+::
+
+    csvtotable data.csv data.html --auto-charts
+
+Multiple charts in one HTML file
+
+::
+
+    csvtotable sales_data.csv report.html \
+        --chart line --chart-x "Month" --chart-y "Revenue" --chart-title "Revenue Trend" \
+        --chart bar --chart-x "Month" --chart-y "Profit" --chart-title "Monthly Profit"
 
 Credits
 -------

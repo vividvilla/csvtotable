@@ -1,0 +1,32 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "csvtotable-table",
+      "dependencies": {
+        "datatables.net-buttons-dt": "4.0.2",
+        "datatables.net-dt": "3.0.2",
+        "datatables.net-scroller-dt": "3.0.0",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.2",
+      },
+    },
+  },
+  "packages": {
+    "datatables.net": ["datatables.net@3.0.2", "", {}, "sha512-+fsSiPEtqfTGQuEla0hpURiYYrjSL5yLlEnUMGy6QFoVtic8vAvJ9Ibwb00772v/jTd8G1kOfJLq34233vhEqw=="],
+
+    "datatables.net-buttons": ["datatables.net-buttons@4.0.2", "", { "dependencies": { "datatables.net": "^3" } }, "sha512-u0+5wEVR8kDaZJHlu6TMKmLrho8mFenBEzrcYtwfENBtDr+tRwzl1SdnJbLVqadAokDrIltlChKfRaEkbE+sOg=="],
+
+    "datatables.net-buttons-dt": ["datatables.net-buttons-dt@4.0.2", "", { "dependencies": { "datatables.net-buttons": "4.0.2", "datatables.net-dt": "^3" } }, "sha512-c6eJvgSoyrO9gK39VojqvFaSISsdIrI9cATT0BC4jVG3q2h86iPN94INUsnaUksOe/4VZlsVpwqWDmdimmn+og=="],
+
+    "datatables.net-dt": ["datatables.net-dt@3.0.2", "", { "dependencies": { "datatables.net": "3.0.2" } }, "sha512-qG0T4hCIfjo+VK6in/anSxwufRNGKiAEp53y+/gBsWp8R7Ik0ZB++J4pq8qAFEKmnSPFIcGSKk1sLLzpXbvcIw=="],
+
+    "datatables.net-scroller": ["datatables.net-scroller@3.0.0", "", { "dependencies": { "datatables.net": "^3" } }, "sha512-nGcwNfEW+vmp0MJSnZikPlUvu7p6LEHLbOdAZ7C71Ec91/7cWJCskk+FKsdLAstpAG+vL/a5yOmbV6l8jYjv8w=="],
+
+    "datatables.net-scroller-dt": ["datatables.net-scroller-dt@3.0.0", "", { "dependencies": { "datatables.net-dt": "^3", "datatables.net-scroller": "3.0.0" } }, "sha512-wB7G048nzrrzBHRZ3P45J06IMeHAzuh09laTNdGpXPcqlO8vtoLG4+OsQGhFkIhdxJ7qLvyVMa1e+18jRwzVSw=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+  }
+}

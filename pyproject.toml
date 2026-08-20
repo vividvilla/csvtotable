@@ -1,0 +1,18 @@
+[project]
+name = "csvtotable"
+version = "3.0.0b1"
+description = "Convert CSV files into searchable and sortable HTML tables"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [{ name = "Vivek R" }]
+keywords = ["csv", "html", "table", "cli"]
+classifiers = [
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/vividvilla/csvtotable"
+Issues = "https://github.com/vividvilla/csvtotable/issues"

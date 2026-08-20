@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: table
+      - run: bun run build
+        working-directory: table
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend
+          path: table/dist
+          if-no-files-found: error
+
+  build:
+    needs: frontend
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            platform: linux-x64
+            executable: csvtotable
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+            executable: csvtotable
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-x64
+            executable: csvtotable
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+            executable: csvtotable
+          - goos: windows
+            goarch: amd64
+            platform: win32-x64
+            executable: csvtotable.exe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend
+          path: table/dist
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Build binary
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v}" -o dist/${{ matrix.executable }} .
+      - run: python scripts/package_release.py --binary dist/${{ matrix.executable }} --platform ${{ matrix.platform }} --version ${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: dist/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.tgz
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - run: sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+        working-directory: dist
+      - name: Create GitHub release
+        run: |
+          args=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" ./*.tar.gz ./*.zip SHA256SUMS --verify-tag --generate-notes "${args[@]}"
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Select npm distribution tag
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          tag=latest
+          if [[ "$version" == *-* ]]; then
+            prerelease=${version#*-}
+            tag=${prerelease%%.*}
+          fi
+          echo "NPM_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Publish native packages
+        run: for package in dist/*.tgz; do npm publish "$package" --access public --provenance --tag "$NPM_TAG"; done
+      - run: npm publish ./npm --access public --provenance --tag "$NPM_TAG"

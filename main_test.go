@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -359,5 +360,52 @@ func readAllCSV(input *strings.Reader, delimiter, quote rune) ([][]string, error
 			return nil, err
 		}
 		records = append(records, record)
+	}
+}
+
+func TestGzipInputs(t *testing.T) {
+	directory := t.TempDir()
+	plain := "city,temperature\nPune,29\n"
+	compressed := filepath.Join(directory, "input.csv.gz")
+	var buffer bytes.Buffer
+	writer := gzip.NewWriter(&buffer)
+	if _, err := io.WriteString(writer, plain); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(compressed, buffer.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(output http.ResponseWriter, _ *http.Request) {
+		output.Write(buffer.Bytes())
+	}))
+	defer server.Close()
+
+	uncompressed := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(uncompressed, []byte(plain), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var want bytes.Buffer
+	if err := convert(options{InputFiles: []string{uncompressed}, Delimiter: ",", Quote: "\""}, &want); err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{compressed, server.URL + "/input.csv.gz"} {
+		var rendered bytes.Buffer
+		if err := convert(options{InputFiles: []string{source}, Delimiter: ",", Quote: "\""}, &rendered); err != nil {
+			t.Fatalf("gzip input %q: %v", source, err)
+		}
+		if rendered.String() != want.String() {
+			t.Errorf("gzip input %q did not match uncompressed output", source)
+		}
+	}
+
+	truncated := filepath.Join(directory, "truncated.csv.gz")
+	if err := os.WriteFile(truncated, buffer.Bytes()[:buffer.Len()-4], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(options{InputFiles: []string{truncated}, Delimiter: ",", Quote: "\""}, io.Discard); err == nil {
+		t.Error("truncated gzip input was accepted")
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -520,6 +521,27 @@ func convert(cli options, destination io.Writer) error {
 	return output.Flush()
 }
 
+// decompress transparently unwraps gzip input, detected by magic bytes so it
+// works for files, URLs, and standard input alike.
+func decompress(input io.ReadCloser) (io.ReadCloser, error) {
+	buffered := bufio.NewReader(input)
+	magic, _ := buffered.Peek(2)
+	if len(magic) < 2 || magic[0] != 0x1f || magic[1] != 0x8b {
+		return readCloser{buffered, input}, nil
+	}
+	unzipped, err := gzip.NewReader(buffered)
+	if err != nil {
+		input.Close()
+		return nil, err
+	}
+	return readCloser{unzipped, input}, nil
+}
+
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
 func openInput(source string) (io.ReadCloser, error) {
 	parsed, err := url.Parse(source)
 	if err == nil && (strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")) {
@@ -532,7 +554,7 @@ func openInput(source string) (io.ReadCloser, error) {
 			response.Body.Close()
 			return nil, fmt.Errorf("HTTP %s", response.Status)
 		}
-		return response.Body, nil
+		return decompress(response.Body)
 	}
 	if strings.Contains(source, "://") {
 		if err != nil {
@@ -541,9 +563,13 @@ func openInput(source string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("unsupported URL scheme %q", parsed.Scheme)
 	}
 	if source == "-" {
-		return io.NopCloser(os.Stdin), nil
+		return decompress(io.NopCloser(os.Stdin))
 	}
-	return os.Open(source)
+	file, err := os.Open(source)
+	if err != nil {
+		return nil, err
+	}
+	return decompress(file)
 }
 
 func csvCharacter(value, name string) (rune, error) {

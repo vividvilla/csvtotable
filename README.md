@@ -4,7 +4,7 @@ CSVtoTable converts CSV files into interactive HTML tables.
 
 - Single native binary with embedded frontend assets
 - Standalone HTML output that works offline
-- Local files, URLs, standard input, and multi-file input
+- Local files, URLs, standard input, gzip archives, and multi-file input
 - Mobile-responsive table layout
 - Search, sorting, pagination, and virtual scrolling
 - Copy, CSV, JSON, and print exports
@@ -20,6 +20,9 @@ csvtotable sample/meteorite-landings-1.csv meteorites.html
 
 # Combine files with the same columns
 csvtotable sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv meteorites.html
+
+# Read a gzip-compressed file
+csvtotable data.csv.gz data.html
 
 # Fetch CSV directly from a URL
 csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/sample/meteorite-landings-1.csv meteorites.html
@@ -39,8 +42,9 @@ input. When combining inputs, their headers and row widths must match. With
 `--no-header`, generated column names are used and row widths must still match.
 The final positional argument is the output file unless `--serve` is used.
 
-BOM-marked UTF-8 and UTF-16 input is detected automatically. Use `--encoding`
-for other encodings, and `--delimiter` or `--quotechar` for custom CSV formats.
+Gzip-compressed input is unpacked automatically, and so is BOM-marked UTF-8 and
+UTF-16 input. Use `--encoding` for other encodings, and `--delimiter` or
+`--quotechar` for custom CSV formats.
 
 Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--pagination` and `--export` disable those

@@ -73,7 +73,7 @@ curl -L https://example.com/data.csv | csvtotable - - > data.html
 BOM-marked UTF-8 and UTF-16 input is detected automatically. Use `--encoding`
 for other encodings, and `--delimiter` or `--quotechar` for custom CSV formats.
 
-Run `csvtotable --help` for all table, pagination, scrolling, and export options.
+Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--pagination` and `--export` disable those
 features.
 

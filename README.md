@@ -4,10 +4,47 @@ CSVtoTable converts CSV files into interactive HTML tables.
 
 - Single native binary with embedded frontend assets
 - Standalone HTML output that works offline
+- Local files, URLs, standard input, and multi-file input
 - Mobile-responsive table layout
 - Search, sorting, pagination, and virtual scrolling
 - Copy, CSV, JSON, and print exports
 - User-controlled light and dark themes
+
+![CSVtoTable demo](sample/table.gif)
+
+## Usage
+
+```sh
+# Write a standalone page
+csvtotable sample/meteorite-landings-1.csv meteorites.html
+
+# Combine files with the same columns
+csvtotable sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv meteorites.html
+
+# Fetch CSV directly from a URL
+csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/sample/meteorite-landings-1.csv meteorites.html
+
+# Open a temporary page in the default browser
+csvtotable data.csv --serve
+
+# Add a title and generate headers for headerless data
+csvtotable data.csv data.html --title "Sales" --no-header
+
+# Read stdin and write stdout
+curl -L https://example.com/data.csv | csvtotable - - > data.html
+```
+
+Inputs may be local files, `http://` or `https://` URLs, or `-` for standard
+input. When combining inputs, their headers and row widths must match. With
+`--no-header`, generated column names are used and row widths must still match.
+The final positional argument is the output file unless `--serve` is used.
+
+BOM-marked UTF-8 and UTF-16 input is detected automatically. Use `--encoding`
+for other encodings, and `--delimiter` or `--quotechar` for custom CSV formats.
+
+Run `csvtotable --help` for all options or `csvtotable --version` for the version.
+For compatibility with version 2, `--pagination` and `--export` disable those
+features.
 
 ## Install
 
@@ -56,29 +93,6 @@ on your `PATH`.
 Prebuilt binaries support Linux x86-64/ARM64, macOS 12+ x86-64/Apple Silicon,
 and Windows 10+ x86-64.
 
-## Usage
-
-```sh
-# Write a standalone page
-csvtotable data.csv data.html
-
-# Open a temporary page in the default browser
-csvtotable data.csv --serve
-
-# Add a title and generate headers for headerless data
-csvtotable data.csv data.html --title "Sales" --no-header
-
-# Read stdin and write stdout
-curl -L https://example.com/data.csv | csvtotable - - > data.html
-```
-
-BOM-marked UTF-8 and UTF-16 input is detected automatically. Use `--encoding`
-for other encodings, and `--delimiter` or `--quotechar` for custom CSV formats.
-
-Run `csvtotable --help` for all options or `csvtotable --version` for the version.
-For compatibility with version 2, `--pagination` and `--export` disable those
-features.
-
 ## Development
 
 Building requires Go 1.24+ and Bun. Distribution packaging also requires Python
@@ -93,7 +107,7 @@ make dist    # binary and host-platform packages under dist/
 ```
 
 ```sh
-./build/csvtotable sample/goog.csv /tmp/goog.html
+./build/csvtotable sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv /tmp/meteorites.html
 ```
 
 ## License

@@ -2,8 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,16 +117,33 @@ func TestCustomQuoteAndUTF16BOM(t *testing.T) {
 }
 
 func TestStdioArgumentsAndServeValidation(t *testing.T) {
+	var help bytes.Buffer
+	command := newCommand(func(options) error {
+		t.Fatal("action ran without input")
+		return nil
+	})
+	command.Writer = &help
+	if err := command.Run(context.Background(), []string{"csvtotable"}); err != nil || !strings.Contains(help.String(), "USAGE:") {
+		t.Fatalf("no arguments did not show help: %v\n%s", err, help.String())
+	}
 	cli, err := parseArgs([]string{"-", "-", "--caption", "stdin"})
-	if err != nil || cli.InputFile != "-" || cli.OutputFile != "-" || cli.Caption != "stdin" {
+	if err != nil || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "-" || cli.OutputFile != "-" || cli.Caption != "stdin" {
 		t.Fatalf("stdio arguments were not preserved: %+v, %v", cli, err)
 	}
 	cli, err = parseArgs([]string{"--delimiter", "-", "input.csv", "output.html"})
-	if err != nil || cli.Delimiter != "-" || cli.InputFile != "input.csv" {
+	if err != nil || cli.Delimiter != "-" || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "input.csv" {
 		t.Fatalf("dash flag value was treated as stdin: %+v, %v", cli, err)
 	}
-	if _, err := parseArgs([]string{"input.csv", "output.html", "--serve"}); err == nil {
-		t.Fatal("--serve silently accepted an output file")
+	served, err := parseArgs([]string{"one.csv", "two.csv", "--serve"})
+	if err != nil || len(served.InputFiles) != 2 || served.OutputFile != "" {
+		t.Fatalf("--serve did not accept multiple inputs: %+v, %v", served, err)
+	}
+	merged, err := parseArgs([]string{"one.csv", "two.csv", "output.html"})
+	if err != nil || len(merged.InputFiles) != 2 || merged.OutputFile != "output.html" {
+		t.Fatalf("multiple positional inputs were not parsed: %+v, %v", merged, err)
+	}
+	if _, err := parseArgs([]string{"-", "-", "--serve"}); err == nil {
+		t.Fatal("multiple stdin inputs were accepted")
 	}
 	directory := t.TempDir()
 	output := filepath.Join(directory, "output.html")
@@ -135,6 +156,79 @@ func TestStdioArgumentsAndServeValidation(t *testing.T) {
 	}
 	if err := run(cli); err == nil || !strings.Contains(err.Error(), "--overwrite") {
 		t.Fatalf("stdin conversion tried to read an overwrite prompt: %v", err)
+	}
+}
+
+func TestMultipleInputsAndURLs(t *testing.T) {
+	directory := t.TempDir()
+	first := filepath.Join(directory, "first.csv")
+	if err := os.WriteFile(first, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(output http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/missing.csv" {
+			http.Error(output, "missing", http.StatusNotFound)
+			return
+		}
+		if request.URL.Path == "/headerless.csv" {
+			fmt.Fprint(output, "Mysuru,25\n")
+			return
+		}
+		fmt.Fprint(output, "city,temperature\nMysuru,25\n")
+	}))
+	defer server.Close()
+
+	cli := options{InputFiles: []string{first, server.URL + "/second.csv"}, Delimiter: ",", Quote: "\""}
+	var rendered bytes.Buffer
+	if err := convert(cli, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, value := range []string{`"headers":["city","temperature"]`, `["Pune","29"]`, `["Mysuru","25"]`} {
+		if !strings.Contains(page, value) {
+			t.Errorf("combined output is missing %s", value)
+		}
+	}
+
+	mismatchedHeader := filepath.Join(directory, "header.csv")
+	if err := os.WriteFile(mismatchedHeader, []byte("city,humidity\nMumbai,70\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli.InputFiles = []string{first, mismatchedHeader}
+	if err := convert(cli, io.Discard); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("mismatched headers were accepted: %v", err)
+	}
+	empty := filepath.Join(directory, "empty.csv")
+	if err := os.WriteFile(empty, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli.InputFiles = []string{first, empty}
+	if err := convert(cli, io.Discard); err == nil || !strings.Contains(err.Error(), "missing header") {
+		t.Fatalf("input without a header was accepted: %v", err)
+	}
+
+	mismatchedColumns := filepath.Join(directory, "columns.csv")
+	if err := os.WriteFile(mismatchedColumns, []byte("city,temperature\nMumbai,31,humid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli.InputFiles = []string{first, mismatchedColumns}
+	if err := convert(cli, io.Discard); err == nil || !strings.Contains(err.Error(), "3 columns; expected 2") {
+		t.Fatalf("mismatched columns were accepted: %v", err)
+	}
+
+	cli.InputFiles = []string{server.URL + "/missing.csv"}
+	if err := convert(cli, io.Discard); err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Fatalf("HTTP failure was ignored: %v", err)
+	}
+
+	headerless := filepath.Join(directory, "headerless.csv")
+	if err := os.WriteFile(headerless, []byte("Pune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli = options{InputFiles: []string{headerless, server.URL + "/headerless.csv"}, Delimiter: ",", Quote: "\"", NoHeader: true}
+	rendered.Reset()
+	if err := convert(cli, &rendered); err != nil || !strings.Contains(rendered.String(), `"headers":["Column 1","Column 2"]`) {
+		t.Fatalf("headerless inputs were not combined: %v", err)
 	}
 }
 
@@ -247,7 +341,7 @@ func TestOutputModeAndSymlink(t *testing.T) {
 }
 
 func TestRejectsMatchingDelimiterAndQuote(t *testing.T) {
-	cli := options{InputFile: "-", Delimiter: ",", Quote: ",", ExportOptions: []string{}}
+	cli := options{InputFiles: []string{"-"}, Delimiter: ",", Quote: ",", ExportOptions: []string{}}
 	if err := convert(cli, io.Discard); err == nil {
 		t.Fatal("matching delimiter and quotechar were accepted")
 	}

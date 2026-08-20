@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,7 +17,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 	"golang.org/x/text/encoding/htmlindex"
@@ -35,7 +38,7 @@ var version = "dev"
 const stdioArgument = "\x00"
 
 type options struct {
-	InputFile     string
+	InputFiles    []string
 	OutputFile    string
 	Caption       string
 	Delimiter     string
@@ -147,7 +150,7 @@ func newCommand(action func(options) error) *cli.Command {
 	return &cli.Command{
 		Name:                      "csvtotable",
 		Usage:                     "Convert CSV files into searchable, sortable HTML tables",
-		UsageText:                 "csvtotable [options] INPUT_FILE [OUTPUT_FILE]",
+		UsageText:                 "csvtotable [options] INPUT... OUTPUT_FILE\n   csvtotable [options] --serve INPUT...",
 		Version:                   buildVersion(),
 		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
@@ -181,20 +184,24 @@ func newCommand(action func(options) error) *cli.Command {
 				}
 			}
 			if len(positional) == 0 {
-				return errors.New("missing argument \"input_file\"")
+				return cli.ShowAppHelp(command)
 			}
-			if len(positional) > 2 {
-				return fmt.Errorf("unexpected argument %q", positional[2])
-			}
-			parsed.InputFile = positional[0]
-			if len(positional) == 2 {
-				parsed.OutputFile = positional[1]
-			}
-			if parsed.Serve && parsed.OutputFile != "" {
-				return errors.New("--serve does not accept an output file")
-			}
-			if !parsed.Serve && parsed.OutputFile == "" {
+			if parsed.Serve {
+				parsed.InputFiles = positional
+			} else if len(positional) < 2 {
 				return errors.New("missing argument \"output_file\"")
+			} else {
+				parsed.InputFiles = positional[:len(positional)-1]
+				parsed.OutputFile = positional[len(positional)-1]
+			}
+			stdinInputs := 0
+			for _, input := range parsed.InputFiles {
+				if input == "-" {
+					stdinInputs++
+				}
+			}
+			if stdinInputs > 1 {
+				return errors.New("standard input may only be used once")
 			}
 			return action(parsed)
 		},
@@ -230,7 +237,7 @@ func run(cli options) error {
 		return convert(cli, os.Stdout)
 	}
 	if _, err := os.Stat(cli.OutputFile); err == nil && !cli.Overwrite {
-		if cli.InputFile == "-" {
+		if slices.Contains(cli.InputFiles, "-") {
 			return errors.New("output file exists; use --overwrite when reading from standard input")
 		}
 		overwrite, err := promptOverwrite(cli.OutputFile, os.Stdin)
@@ -369,37 +376,8 @@ func convert(cli options, destination io.Writer) error {
 	if delimiter == quote {
 		return errors.New("delimiter and quotechar must differ")
 	}
-	var input io.Reader = os.Stdin
-	var file *os.File
-	if cli.InputFile != "-" {
-		file, err = os.Open(cli.InputFile)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		input = file
-	}
-	input, err = decodeInput(input, cli.Encoding)
-	if err != nil {
-		return err
-	}
-	reader := newCSVReader(input, delimiter, quote)
-	first, err := reader.Read()
-	if err != nil && !errors.Is(err, io.EOF) {
-		return err
-	}
-	headers := []string{}
-	var firstRow []string
-	if err == nil {
-		if cli.NoHeader {
-			headers = make([]string, len(first))
-			for i := range first {
-				headers[i] = fmt.Sprintf("Column %d", i+1)
-			}
-			firstRow = first
-		} else {
-			headers = first
-		}
+	if len(cli.InputFiles) == 0 {
+		return errors.New("missing argument \"input_file\"")
 	}
 
 	caption := cli.Caption
@@ -431,20 +409,24 @@ func convert(cli options, destination io.Writer) error {
 		ExportOptions: cli.ExportOptions,
 	}
 
-	headersJSON, err := json.Marshal(headers)
-	if err != nil {
-		return err
-	}
 	optionsJSON, err := json.Marshal(settings)
 	if err != nil {
 		return err
 	}
 	output := bufio.NewWriter(destination)
-	if _, err := fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main>\n<button id=\"theme-toggle\" class=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\">☾ Dark</button>\n<table id=\"table\">%s</table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), captionHTML, headersJSON); err != nil {
+	headers := []string{}
+	expectedColumns := -1
+	started := false
+	needsComma := false
+	startOutput := func() error {
+		headersJSON, err := json.Marshal(headers)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main>\n<button id=\"theme-toggle\" class=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\">☾ Dark</button>\n<table id=\"table\">%s</table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), captionHTML, headersJSON)
+		started = err == nil
 		return err
 	}
-
-	needsComma := false
 	writeRow := func(row []string) error {
 		encoded, err := json.Marshal(row)
 		if err != nil {
@@ -461,20 +443,73 @@ func convert(cli options, destination io.Writer) error {
 		needsComma = true
 		return nil
 	}
-	if firstRow != nil {
-		if err := writeRow(firstRow); err != nil {
-			return err
+	strict := len(cli.InputFiles) > 1
+	for inputIndex, source := range cli.InputFiles {
+		input, err := openInput(source)
+		if err != nil {
+			return fmt.Errorf("input %q: %w", source, err)
+		}
+		decoded, err := decodeInput(input, cli.Encoding)
+		if err != nil {
+			input.Close()
+			return fmt.Errorf("input %q: %w", source, err)
+		}
+		reader := newCSVReader(decoded, delimiter, quote)
+		rowNumber := 0
+		readErr := func() error {
+			for {
+				record, err := reader.Read()
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					return err
+				}
+				rowNumber++
+				if rowNumber == 1 && !cli.NoHeader {
+					if inputIndex == 0 {
+						headers = record
+						expectedColumns = len(record)
+						if err := startOutput(); err != nil {
+							return err
+						}
+					} else if !slices.Equal(record, headers) {
+						return fmt.Errorf("header %q does not match first input header %q", record, headers)
+					}
+					continue
+				}
+				if !started {
+					expectedColumns = len(record)
+					headers = make([]string, expectedColumns)
+					for i := range headers {
+						headers[i] = fmt.Sprintf("Column %d", i+1)
+					}
+					if err := startOutput(); err != nil {
+						return err
+					}
+				}
+				if strict && len(record) != expectedColumns {
+					return fmt.Errorf("row %d has %d columns; expected %d", rowNumber, len(record), expectedColumns)
+				}
+				if err := writeRow(record); err != nil {
+					return err
+				}
+			}
+			if strict && !cli.NoHeader && rowNumber == 0 {
+				return errors.New("missing header")
+			}
+			return nil
+		}()
+		closeErr := input.Close()
+		if readErr != nil {
+			return fmt.Errorf("input %q: %w", source, readErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("input %q: %w", source, closeErr)
 		}
 	}
-	for {
-		record, err := reader.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if err := writeRow(record); err != nil {
+	if !started {
+		if err := startOutput(); err != nil {
 			return err
 		}
 	}
@@ -483,6 +518,32 @@ func convert(cli options, destination io.Writer) error {
 		return err
 	}
 	return output.Flush()
+}
+
+func openInput(source string) (io.ReadCloser, error) {
+	parsed, err := url.Parse(source)
+	if err == nil && (strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https")) {
+		client := http.Client{Timeout: 2 * time.Minute}
+		response, err := client.Get(source)
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			response.Body.Close()
+			return nil, fmt.Errorf("HTTP %s", response.Status)
+		}
+		return response.Body, nil
+	}
+	if strings.Contains(source, "://") {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unsupported URL scheme %q", parsed.Scheme)
+	}
+	if source == "-" {
+		return io.NopCloser(os.Stdin), nil
+	}
+	return os.Open(source)
 }
 
 func csvCharacter(value, name string) (rune, error) {

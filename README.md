@@ -23,19 +23,15 @@ Or install it:
 
 ```sh
 pipx install csvtotable
-# or, inside a virtual environment:
-pip install csvtotable
+pip install csvtotable # or inside a virtual environment:
+uv tool install csvtotable
 ```
-
-`uv tool install csvtotable` works too. Python is only needed to install the
-prebuilt executable.
 
 ### npx or npm
 
 ```sh
 npx @vividvilla/csvtotable data.csv data.html
-# or install globally:
-npm install --global @vividvilla/csvtotable
+npm install --global @vividvilla/csvtotable # or install globally:
 ```
 
 To run a particular published version:

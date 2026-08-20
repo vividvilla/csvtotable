@@ -45,6 +45,12 @@ uvx csvtotable@X.Y.Z data.csv data.html
 npx @vividvilla/csvtotable@X.Y.Z data.csv data.html
 ```
 
+### Homebrew
+
+```sh
+brew install vividvilla/tap/csvtotable
+```
+
 ### Standalone binary
 
 Download an archive from [GitHub Releases](https://github.com/vividvilla/csvtotable/releases),

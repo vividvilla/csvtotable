@@ -1,104 +1,364 @@
+/* Light is the base palette; dark follows the system unless the reader picks a
+   theme, so a system-dark reader never gets a flash of light before the script
+   runs. */
 :root {
   color-scheme: light;
-  --csvtotable-accent: #004da8;
-  --csvtotable-accent-hover: #003b82;
-  --csvtotable-border: #d1d5db;
-  --csvtotable-bg: #fff;
-  --csvtotable-text: #003b73;
+  --ct-paper: #fff;
+  --ct-ink: #15181d;
+  --ct-muted: #61666e;
+  --ct-rule: #e6e8eb;
+  --ct-rule-strong: #cbd0d6;
+  --ct-accent: #004da8;
+  --ct-wash: #eaf1fc;
+  --ct-hover: #f4f6f8;
+  --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2361666e' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
 }
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --ct-paper: #101317;
+    --ct-ink: #e7eaee;
+    --ct-muted: #98a0ab;
+    --ct-rule: #252a32;
+    --ct-rule-strong: #39414c;
+    --ct-accent: #74abf7;
+    --ct-wash: #15243a;
+    --ct-hover: #191d24;
+    --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a0ab' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
+  }
+}
+
 :root.dark {
   color-scheme: dark;
-  --csvtotable-accent: #60a5fa;
-  --csvtotable-accent-hover: #3b82f6;
-  --csvtotable-border: #4b5563;
-  --csvtotable-bg: #111827;
-  --csvtotable-text: #bfdbfe;
+  --ct-paper: #101317;
+  --ct-ink: #e7eaee;
+  --ct-muted: #98a0ab;
+  --ct-rule: #252a32;
+  --ct-rule-strong: #39414c;
+  --ct-accent: #74abf7;
+  --ct-wash: #15243a;
+  --ct-hover: #191d24;
+  --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a0ab' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
+}
+
+/* Sort carets ride DataTables' own tokens rather than duplicated selectors. */
+:root,
+table.dataTable {
+  --dt-order-arrow_color: var(--ct-muted);
+  --dt-order-arrow_color-current: var(--ct-accent);
+  --dt-order-arrow_opacity: .3;
+  --dt-order-arrow_opacity-current: 1;
+  --dt-order-header_outline-hover: 2px solid transparent;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+
 body {
-  background: var(--csvtotable-bg);
-  color: var(--csvtotable-text);
+  background: var(--ct-paper);
+  color: var(--ct-ink);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
-main { margin: 1.5rem; }
-.csvtotable-theme {
-  background: var(--csvtotable-bg);
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
-  color: var(--csvtotable-accent);
-  cursor: pointer;
-  font: inherit;
-  padding: .35rem .6rem;
-  white-space: nowrap;
-}
-.csvtotable-theme:hover { border-color: var(--csvtotable-accent); }
-.csvtotable-theme:focus-visible {
-  outline: 2px solid var(--csvtotable-accent);
+
+main { padding: 1.6rem 1.5rem 1rem; }
+
+:focus-visible {
+  outline: 2px solid var(--ct-accent);
   outline-offset: 2px;
 }
-table.dataTable caption {
-  color: var(--csvtotable-accent);
-  font-size: 1.25rem;
+
+#csvtotable-title {
+  font-size: 1.3rem;
   font-weight: 600;
-  padding: .75rem 0 1rem;
+  letter-spacing: -.015em;
+  margin: 0 0 1.1rem;
+}
+
+/* Toolbar ------------------------------------------------------------- */
+
+div.dt-container { color: var(--ct-ink); font-size: .875rem; }
+
+div.dt-container div.dt-layout-row { margin: 0 0 .85rem; }
+div.dt-container div.dt-layout-row.dt-layout-table { margin: 0; }
+/* Space rows above the table with a bottom margin and rows below it with a top
+   one: a trailing margin escapes the container and the height fit cannot see it. */
+div.dt-container div.dt-layout-row.dt-layout-table ~ div.dt-layout-row { margin: .85rem 0 0; }
+div.dt-container div.dt-layout-start > *:not(:last-child) { margin-right: .9rem; }
+div.dt-container div.dt-layout-end > *:not(:first-child) { margin-left: .3rem; }
+
+div.dt-container div.dt-search input {
+  background: var(--ct-paper) var(--ct-search-icon) no-repeat .65rem center / 14px;
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 7px;
+  color: inherit;
+  font: inherit;
+  font-size: .875rem;
+  margin: 0;
+  padding: .5rem .7rem .5rem 2.05rem;
+  width: 19rem;
+}
+div.dt-container div.dt-search input::placeholder { color: var(--ct-muted); }
+div.dt-container div.dt-search input:focus {
+  border-color: var(--ct-accent);
+  box-shadow: 0 0 0 3px var(--ct-wash);
+  outline: none;
+}
+
+div.dt-container div.dt-info {
+  color: var(--ct-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .75rem;
+  padding: 0;
+  white-space: nowrap;
+}
+
+/* Everything but search is a ghost control: rare actions stay quiet. */
+div.dt-container div.dt-buttons { flex-wrap: wrap; gap: .15rem; }
+div.dt-container div.dt-buttons > button.dt-button,
+.csvtotable-theme {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ct-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: .8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin: 0;
+  padding: .45rem .6rem;
+  text-transform: none;
+}
+div.dt-container div.dt-buttons > button.dt-button:hover:not(.disabled),
+div.dt-container div.dt-buttons > button.dt-button.dt-button-active,
+.csvtotable-theme:hover {
+  background: var(--ct-hover);
+  border-color: transparent;
+  color: var(--ct-ink);
+}
+.csvtotable-theme {
+  display: grid;
+  font-size: .9rem;
+  height: 2.05rem;
+  padding: 0;
+  place-items: center;
+  width: 2.05rem;
+}
+/* The scrim still closes the menu on an outside click; it just stops dimming
+   the whole page for a four-item dropdown. */
+div.dt-button-background { background: transparent; }
+div.dt-button-collection {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  padding: .25rem;
+}
+div.dt-button-collection button.dt-button {
+  border-radius: 5px;
+  color: var(--ct-ink);
+  font-size: .8125rem;
+  padding: .4rem .6rem;
   text-align: left;
 }
-.dt-container { font-size: .875rem; }
-.dt-container .dt-search input,
-.dt-container .dt-length select {
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
-  padding: .35rem .5rem;
+div.dt-button-collection button.dt-button:hover { background: var(--ct-hover); }
+
+/* Active filters ------------------------------------------------------ */
+
+.csvtotable-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin: -.35rem 0 .85rem;
 }
-.dt-container .dt-buttons > .dt-button {
-  background: var(--csvtotable-accent);
-  border: 0;
-  border-radius: .25rem;
-  color: #fff;
+.csvtotable-filters[hidden] { display: none; }
+
+.csvtotable-chip {
+  align-items: center;
+  background: var(--ct-wash);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--ct-accent);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: .75rem;
+  gap: .4rem;
+  padding: .28rem .5rem .28rem .6rem;
+}
+.csvtotable-chip:hover { border-color: var(--ct-accent); }
+.csvtotable-chip-key {
+  color: var(--ct-muted);
+  font-size: .6875rem;
   font-weight: 600;
-  padding: .45rem .75rem;
+  letter-spacing: .07em;
   text-transform: uppercase;
 }
-.dt-container .dt-buttons > .dt-button:hover:not(.disabled) {
-  background: var(--csvtotable-accent-hover);
+.csvtotable-chip-value {
+  font-weight: 600;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csvtotable-chip-remove { font-size: .9rem; line-height: 1; opacity: .55; }
+.csvtotable-chip:hover .csvtotable-chip-remove { opacity: 1; }
+
+.csvtotable-clear {
+  background: none;
   border: 0;
-  color: #fff;
+  border-radius: 4px;
+  color: var(--ct-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: .75rem;
+  margin-left: .25rem;
+  padding: .28rem .2rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.csvtotable-clear:hover { color: var(--ct-ink); }
+
+/* Table --------------------------------------------------------------- */
+
+table.dataTable {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+table.dataTable > thead > tr > th,
+table.dataTable > thead > tr > td {
+  border-bottom: 1px solid var(--ct-rule-strong);
+  color: var(--ct-muted);
+  font-size: .6875rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  padding: .5rem .75rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+table.dataTable > thead > tr > th.dt-ordering-asc,
+table.dataTable > thead > tr > th.dt-ordering-desc { color: var(--ct-ink); }
+table.dataTable > thead > tr > th div.dt-column-header {
+  gap: .4rem;
+  justify-content: flex-start;
+}
+/* DataTables grows the title to fill the cell, which strands the caret at the
+   far edge and reads as a stray mark between two columns. */
+table.dataTable > thead > tr > th div.dt-column-header .dt-column-title { flex-grow: 0; }
+table.dataTable > thead > tr > th.dt-type-numeric div.dt-column-header,
+table.dataTable > thead > tr > th.dt-type-date div.dt-column-header {
+  justify-content: flex-end;
 }
 
-table.dataTable tfoot th {
-  font-weight: 400;
-  padding: .4rem .5rem;
+table.dataTable > tbody > tr { background: transparent; }
+table.dataTable > tbody > tr > td {
+  border-bottom: 1px solid var(--ct-rule);
+  color: var(--ct-ink);
+  font-size: .8125rem;
+  padding: .48rem .75rem;
 }
-.dt-container tfoot input,
-.dt-container tfoot select {
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
+table.dataTable > tbody > tr:hover > td { background: var(--ct-hover); }
+table.dataTable > tbody > tr > td.dt-type-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The filter row lives in the footer so DataTables keeps it aligned through
+   column hides, but it belongs beside the headers it filters. */
+div.dt-container div.dt-scroll { display: flex; flex-direction: column; }
+div.dt-container div.dt-scroll-head { order: 1; }
+div.dt-container div.dt-scroll-foot { order: 2; }
+div.dt-container div.dt-scroll-body { min-height: 0; order: 3; }
+div.dt-container div.dt-scroll-foot { border-top: 0; }
+
+table.dataTable > tfoot > tr > th {
+  border-bottom: 1px solid var(--ct-rule);
+  border-top: 0;
+  font-weight: 400;
+  padding: .4rem .5rem .55rem;
+  text-transform: none;
+}
+div.dt-container table.dataTable tfoot input,
+div.dt-container table.dataTable tfoot select {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule);
+  border-radius: 5px;
+  color: inherit;
   font: inherit;
+  font-size: .75rem;
   max-width: 20rem;
   min-width: 0;
-  padding: .25rem .35rem;
+  padding: .28rem .35rem;
   width: 100%;
 }
+div.dt-container table.dataTable tfoot input::placeholder { color: var(--ct-muted); }
+div.dt-container table.dataTable tfoot input:focus,
+div.dt-container table.dataTable tfoot select:focus {
+  border-color: var(--ct-accent);
+  outline: none;
+}
+
+/* Footer row ---------------------------------------------------------- */
+
+div.dt-container div.dt-length select {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  font-size: .8125rem;
+  padding: .3rem .4rem;
+}
+div.dt-container div.dt-paging button.dt-paging-button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ct-muted);
+  font-size: .8125rem;
+  min-width: 2rem;
+  padding: .35rem .5rem;
+}
+div.dt-container div.dt-paging button.dt-paging-button:hover:not(.disabled) {
+  background: var(--ct-hover);
+  border: 0;
+  color: var(--ct-ink);
+}
+div.dt-container div.dt-paging button.dt-paging-button.current,
+div.dt-container div.dt-paging button.dt-paging-button.current:hover {
+  background: var(--ct-wash);
+  border: 0;
+  color: var(--ct-accent);
+  font-weight: 600;
+}
+div.dt-container div.dt-paging button.dt-paging-button.disabled { opacity: .35; }
 
 @media (max-width: 767px) {
-  main { margin: .75rem; }
-  .dt-container { font-size: .8125rem; }
-  .dt-container .dt-buttons { justify-content: flex-start; }
-  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end {
+  main { padding: 1rem .8rem; }
+  div.dt-container { font-size: .8125rem; }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) {
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: .5rem;
+    justify-content: flex-start;
+    margin: 0;
+    text-align: left;
     width: 100%;
   }
-  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end > * {
-    margin: 0;
-  }
-  .dt-container .dt-search { flex: 1; }
-  .dt-container .dt-search label { display: block; }
-  .dt-container .dt-search input {
-    margin: 0;
-    width: 100%;
-  }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell > * { margin: 0; }
+  div.dt-container div.dt-search { flex: 1 1 100%; }
+  div.dt-container div.dt-search input { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

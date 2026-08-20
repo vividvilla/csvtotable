@@ -40,14 +40,15 @@ func TestConverterCompatibility(t *testing.T) {
 	html := string(page)
 	checks := []string{
 		"<title>&lt;Table&gt;</title>",
-		"<caption>&lt;Table&gt;</caption>",
+		"<h1 id=\"csvtotable-title\">&lt;Table&gt;</h1>",
+		`aria-labelledby="csvtotable-title"`,
 		"<button id=\"theme-toggle\"",
 		"CsvToTable.setupTheme(\"#theme-toggle\")",
 		`"headers":["name","value"]`,
 		`"pagination":false`,
 		`"height":"50vh"`,
 		"DataTables 3.0.2",
-		"--csvtotable-accent",
+		"--ct-accent",
 		`\u003c/script\u003e`,
 	}
 	for _, check := range checks {
@@ -72,8 +73,8 @@ func TestConverterCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	page, _ = os.ReadFile(withoutCaption)
-	if strings.Contains(string(page), "<caption>") {
-		t.Fatal("empty caption rendered a caption element")
+	if strings.Contains(string(page), `<h1 id="csvtotable-title"`) {
+		t.Fatal("empty caption rendered a heading")
 	}
 
 	for height, want := range map[string]string{"70%": `"height":"70vh"`, "calc(100% - 2rem)": `"height":"calc(100% - 2rem)"`} {

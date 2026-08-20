@@ -393,9 +393,11 @@ func convert(cli options, destination io.Writer) error {
 	if title == "" {
 		title = "Table"
 	}
-	captionHTML := ""
+	headingHTML := ""
+	tableLabel := ` aria-label="Table"`
 	if caption != "" {
-		captionHTML = "<caption>" + html.EscapeString(caption) + "</caption>"
+		headingHTML = "<h1 id=\"csvtotable-title\">" + html.EscapeString(caption) + "</h1>\n"
+		tableLabel = ` aria-labelledby="csvtotable-title"`
 	}
 	height := cli.Height
 	if height == "" {
@@ -429,7 +431,7 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main>\n<button id=\"theme-toggle\" class=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\">☾ Dark</button>\n<table id=\"table\">%s</table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), captionHTML, headersJSON)
+		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main>\n%s<button id=\"theme-toggle\" class=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\"></button>\n<table id=\"table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headingHTML, tableLabel, headersJSON)
 		started = err == nil
 		return err
 	}

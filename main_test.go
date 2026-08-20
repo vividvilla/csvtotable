@@ -410,13 +410,16 @@ func TestGzipInputs(t *testing.T) {
 	}
 }
 
-func TestColumnFilterOptions(t *testing.T) {
-	parsed, err := parseArgs([]string{"input.csv", "output.html"})
+func TestToolbarAndColumnFilterOptions(t *testing.T) {
+	parsed, err := parseArgs([]string{"--export-options", "colvis", "input.csv", "output.html"})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("colvis was rejected: %v", err)
 	}
 	if !parsed.ColumnFilters {
 		t.Error("column filters are not enabled by default")
+	}
+	if _, err := parseArgs([]string{"--export-options", "pdf", "input.csv", "output.html"}); err == nil {
+		t.Error("unknown toolbar button was accepted")
 	}
 	parsed, err = parseArgs([]string{"--no-column-filters", "input.csv", "output.html"})
 	if err != nil {

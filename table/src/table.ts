@@ -2,6 +2,7 @@ import DataTable from "datatables.net-dt";
 import "datatables.net-buttons-dt";
 import "datatables.net-buttons/js/buttons.html5.mjs";
 import "datatables.net-buttons/js/buttons.print.mjs";
+import "datatables.net-buttons/js/buttons.colVis.mjs";
 import "datatables.net-scroller-dt";
 
 export interface CsvTableData {
@@ -16,7 +17,7 @@ export interface CsvTableOptions {
   virtualScroll: number;
   preserveSort: boolean;
   exportEnabled: boolean;
-  exportOptions: Array<"copy" | "csv" | "json" | "print">;
+  exportOptions: Array<"copy" | "csv" | "json" | "print" | "colvis">;
   columnFilters: boolean;
 }
 
@@ -112,9 +113,9 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
     options.virtualScroll === 0 ||
     (options.virtualScroll > 0 && data.rows.length > options.virtualScroll);
   const lengthMenu = [...new Set([-1, 10, 25, 50, options.displayLength])].sort((a, b) => a - b);
-  const exportButtons = options.exportOptions.length
-    ? options.exportOptions
-    : ["copy", "csv", "json", "print"];
+  const exportButtons = (
+    options.exportOptions.length ? options.exportOptions : ["copy", "csv", "json", "print", "colvis"]
+  ).map((name) => (name === "colvis" ? { extend: "colvis", text: "Columns" } : name));
   const layout: Record<string, unknown> = {};
   const themeToggle = document.querySelector("#theme-toggle");
   const element = document.querySelector<HTMLTableElement>(selector);

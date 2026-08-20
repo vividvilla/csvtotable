@@ -168,7 +168,7 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.Int64Flag{Name: "virtual-scroll", Aliases: []string{"vs"}, Value: 1000, Usage: "Virtual-scroll row threshold", Destination: &parsed.VirtualScroll},
 			&cli.BoolFlag{Name: "no-header", Aliases: []string{"nh"}, Usage: "Generate column names instead of using the first row", Destination: &parsed.NoHeader},
 			&cli.BoolFlag{Name: "export", Aliases: []string{"e"}, Usage: "Disable export buttons", Destination: &disableExport},
-			&cli.StringSliceFlag{Name: "export-options", Aliases: []string{"eo"}, Usage: "Export button: copy, csv, json, or print; may be repeated", Destination: &parsed.ExportOptions},
+			&cli.StringSliceFlag{Name: "export-options", Aliases: []string{"eo"}, Usage: "Toolbar button: copy, csv, json, print, or colvis; may be repeated", Destination: &parsed.ExportOptions},
 			&cli.BoolFlag{Name: "preserve-sort", Aliases: []string{"ps"}, Usage: "Preserve input row order", Destination: &parsed.PreserveSort},
 			&cli.StringFlag{Name: "encoding", Usage: "Input character encoding", Destination: &parsed.Encoding},
 			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
@@ -178,7 +178,7 @@ func newCommand(action func(options) error) *cli.Command {
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
 			for _, option := range parsed.ExportOptions {
-				if option != "copy" && option != "csv" && option != "json" && option != "print" {
+				if !slices.Contains([]string{"copy", "csv", "json", "print", "colvis"}, option) {
 					return fmt.Errorf("invalid export option %q", option)
 				}
 			}

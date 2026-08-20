@@ -1,0 +1,21 @@
+{
+  "name": "csvtotable-table",
+  "version": "3.0.0-beta.5",
+  "private": true,
+  "description": "Internal browser bundle for csvtotable",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "bun run build:global && bun run typecheck",
+    "build:global": "bun build src/global.ts --outdir dist --entry-naming csvtotable-table.min.[ext] --target browser --format iife --minify",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "datatables.net-buttons-dt": "4.0.2",
+    "datatables.net-dt": "3.0.2",
+    "datatables.net-scroller-dt": "3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

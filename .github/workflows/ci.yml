@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: make test dist
+      - name: Smoke-test Python wheel
+        run: |
+          python -m venv /tmp/csvtotable-wheel
+          /tmp/csvtotable-wheel/bin/pip install dist/*manylinux_2_17*.whl
+          /tmp/csvtotable-wheel/bin/csvtotable --version
+      - name: Smoke-test npm packages
+        run: |
+          npm pack ./npm --pack-destination dist
+          mkdir /tmp/csvtotable-npm
+          cd /tmp/csvtotable-npm
+          npm install "$GITHUB_WORKSPACE"/dist/*.tgz --offline
+          ./node_modules/.bin/csvtotable --version

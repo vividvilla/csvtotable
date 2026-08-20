@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light;
+  --csvtotable-accent: #004da8;
+  --csvtotable-accent-hover: #003b82;
+  --csvtotable-border: #d1d5db;
+  --csvtotable-bg: #fff;
+  --csvtotable-text: #003b73;
+}
+:root.dark {
+  color-scheme: dark;
+  --csvtotable-accent: #60a5fa;
+  --csvtotable-accent-hover: #3b82f6;
+  --csvtotable-border: #4b5563;
+  --csvtotable-bg: #111827;
+  --csvtotable-text: #bfdbfe;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--csvtotable-bg);
+  color: var(--csvtotable-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+main { margin: 1.5rem; }
+.csvtotable-theme {
+  background: var(--csvtotable-bg);
+  border: 1px solid var(--csvtotable-border);
+  border-radius: .25rem;
+  color: var(--csvtotable-accent);
+  cursor: pointer;
+  font: inherit;
+  padding: .35rem .6rem;
+  white-space: nowrap;
+}
+.csvtotable-theme:hover { border-color: var(--csvtotable-accent); }
+.csvtotable-theme:focus-visible {
+  outline: 2px solid var(--csvtotable-accent);
+  outline-offset: 2px;
+}
+table.dataTable caption {
+  color: var(--csvtotable-accent);
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: .75rem 0 1rem;
+  text-align: left;
+}
+.dt-container { font-size: .875rem; }
+.dt-container .dt-search input,
+.dt-container .dt-length select {
+  border: 1px solid var(--csvtotable-border);
+  border-radius: .25rem;
+  padding: .35rem .5rem;
+}
+.dt-container .dt-buttons > .dt-button {
+  background: var(--csvtotable-accent);
+  border: 0;
+  border-radius: .25rem;
+  color: #fff;
+  font-weight: 600;
+  padding: .45rem .75rem;
+  text-transform: uppercase;
+}
+.dt-container .dt-buttons > .dt-button:hover:not(.disabled) {
+  background: var(--csvtotable-accent-hover);
+  border: 0;
+  color: #fff;
+}
+
+@media (max-width: 767px) {
+  main { margin: .75rem; }
+  .dt-container { font-size: .8125rem; }
+  .dt-container .dt-buttons { justify-content: flex-start; }
+  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end {
+    align-items: center;
+    display: flex;
+    gap: .5rem;
+    width: 100%;
+  }
+  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end > * {
+    margin: 0;
+  }
+  .dt-container .dt-search { flex: 1; }
+  .dt-container .dt-search label { display: block; }
+  .dt-container .dt-search input {
+    margin: 0;
+    width: 100%;
+  }
+}

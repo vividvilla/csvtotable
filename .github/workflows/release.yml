@@ -109,14 +109,13 @@ jobs:
 
   publish-homebrew:
     needs: github-release
-    if: ${{ vars.HOMEBREW_TAP_REPOSITORY != '' }}
     runs-on: ubuntu-latest
     environment: release
     steps:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
-          repository: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+          repository: vividvilla/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
       - name: Download release archives

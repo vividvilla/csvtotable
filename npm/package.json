@@ -1,6 +1,6 @@
 {
   "name": "@vividvilla/csvtotable",
-  "version": "3.0.0-beta.3",
+  "version": "3.0.0-beta.4",
   "description": "Convert CSV files into searchable and sortable HTML tables",
   "license": "MIT",
   "repository": {
@@ -12,10 +12,10 @@
   },
   "files": ["bin"],
   "optionalDependencies": {
-    "@vividvilla/csvtotable-darwin-arm64": "3.0.0-beta.3",
-    "@vividvilla/csvtotable-darwin-x64": "3.0.0-beta.3",
-    "@vividvilla/csvtotable-linux-arm64": "3.0.0-beta.3",
-    "@vividvilla/csvtotable-linux-x64": "3.0.0-beta.3",
-    "@vividvilla/csvtotable-win32-x64": "3.0.0-beta.3"
+    "@vividvilla/csvtotable-darwin-arm64": "3.0.0-beta.4",
+    "@vividvilla/csvtotable-darwin-x64": "3.0.0-beta.4",
+    "@vividvilla/csvtotable-linux-arm64": "3.0.0-beta.4",
+    "@vividvilla/csvtotable-linux-x64": "3.0.0-beta.4",
+    "@vividvilla/csvtotable-win32-x64": "3.0.0-beta.4"
   }
 }

@@ -55,6 +55,7 @@ type options struct {
 	ExportOptions []string
 	PreserveSort  bool
 	Encoding      string
+	ColumnFilters bool
 }
 
 type tableOptions struct {
@@ -65,6 +66,7 @@ type tableOptions struct {
 	PreserveSort  bool     `json:"preserveSort"`
 	ExportEnabled bool     `json:"exportEnabled"`
 	ExportOptions []string `json:"exportOptions"`
+	ColumnFilters bool     `json:"columnFilters"`
 }
 
 func main() {
@@ -147,7 +149,7 @@ func protectStdioArgs(command *cli.Command, args []string) []string {
 
 func newCommand(action func(options) error) *cli.Command {
 	var parsed options
-	var disablePagination, disableExport bool
+	var disablePagination, disableExport, noColumnFilters bool
 	return &cli.Command{
 		Name:                      "csvtotable",
 		Usage:                     "Convert CSV files into searchable, sortable HTML tables",
@@ -169,10 +171,12 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.StringSliceFlag{Name: "export-options", Aliases: []string{"eo"}, Usage: "Export button: copy, csv, json, or print; may be repeated", Destination: &parsed.ExportOptions},
 			&cli.BoolFlag{Name: "preserve-sort", Aliases: []string{"ps"}, Usage: "Preserve input row order", Destination: &parsed.PreserveSort},
 			&cli.StringFlag{Name: "encoding", Usage: "Input character encoding", Destination: &parsed.Encoding},
+			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
 		},
 		Action: func(_ context.Context, command *cli.Command) error {
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
+			parsed.ColumnFilters = !noColumnFilters
 			for _, option := range parsed.ExportOptions {
 				if option != "copy" && option != "csv" && option != "json" && option != "print" {
 					return fmt.Errorf("invalid export option %q", option)
@@ -408,6 +412,7 @@ func convert(cli options, destination io.Writer) error {
 		PreserveSort:  cli.PreserveSort,
 		ExportEnabled: cli.ExportEnabled,
 		ExportOptions: cli.ExportOptions,
+		ColumnFilters: cli.ColumnFilters,
 	}
 
 	optionsJSON, err := json.Marshal(settings)

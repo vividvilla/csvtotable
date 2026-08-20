@@ -17,10 +17,13 @@ export interface CsvTableOptions {
   preserveSort: boolean;
   exportEnabled: boolean;
   exportOptions: Array<"copy" | "csv" | "json" | "print">;
+  columnFilters: boolean;
 }
 
 const buttons = (DataTable as any).ext.buttons;
 const themeKey = "csvtotable-theme";
+// A column with more distinct values than this gets a text box instead of a dropdown.
+const filterChoiceLimit = 25;
 buttons.json = {
   text: "JSON",
   action(_event: Event, table: any) {
@@ -61,6 +64,49 @@ export function setupTheme(selector: string) {
   button.addEventListener("click", () => apply(theme === "dark" ? "light" : "dark"));
 }
 
+function addColumnFilters(table: any, data: CsvTableData) {
+  table.columns().every(function (this: any) {
+    const cell: HTMLElement | null = this.footer();
+    if (!cell) return;
+
+    const column = this;
+    const index = column.index();
+    const label = `Filter ${data.headers[index] ?? `column ${index + 1}`}`;
+    const choices = new Set<string>();
+    for (const row of data.rows) {
+      if (row[index]) choices.add(row[index]);
+      if (choices.size > filterChoiceLimit) break;
+    }
+
+    if (choices.size <= filterChoiceLimit) {
+      const select = document.createElement("select");
+      select.ariaLabel = label;
+      select.add(new Option("All", ""));
+      for (const choice of [...choices].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
+        select.add(new Option(choice, choice));
+      }
+      // An empty exact search matches only empty cells, so "All" clears the filter instead.
+      select.addEventListener("change", () =>
+        column.search(select.value, { exact: Boolean(select.value) }).draw(),
+      );
+      cell.replaceChildren(select);
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "search";
+    input.placeholder = "Filter";
+    input.size = 1; // let the column keep its content width instead of the input's default
+    input.ariaLabel = label;
+    let pending = 0;
+    input.addEventListener("input", () => {
+      clearTimeout(pending);
+      pending = window.setTimeout(() => column.search(input.value).draw(), 150);
+    });
+    cell.replaceChildren(input);
+  });
+}
+
 export function createCsvTable(selector: string, data: CsvTableData, options: CsvTableOptions) {
   const virtual =
     options.virtualScroll === 0 ||
@@ -71,6 +117,12 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
     : ["copy", "csv", "json", "print"];
   const layout: Record<string, unknown> = {};
   const themeToggle = document.querySelector("#theme-toggle");
+  const element = document.querySelector<HTMLTableElement>(selector);
+
+  if (options.columnFilters && element) {
+    const row = element.createTFoot().insertRow();
+    for (const _ of data.headers) row.appendChild(document.createElement("th"));
+  }
 
   if (options.exportEnabled) layout.topStart = { buttons: exportButtons };
   if (themeToggle) layout.topEnd = [{ search: { placeholder: "Search", text: "" } }, themeToggle];
@@ -90,6 +142,7 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
     scroller: virtual,
   } as any);
   document.querySelector<HTMLInputElement>(".dt-search input")?.setAttribute("aria-label", "Search");
+  if (options.columnFilters) addColumnFilters(table, data);
 
   if (options.height === "auto") {
     let frame = 0;

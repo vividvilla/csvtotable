@@ -409,3 +409,20 @@ func TestGzipInputs(t *testing.T) {
 		t.Error("truncated gzip input was accepted")
 	}
 }
+
+func TestColumnFilterOptions(t *testing.T) {
+	parsed, err := parseArgs([]string{"input.csv", "output.html"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !parsed.ColumnFilters {
+		t.Error("column filters are not enabled by default")
+	}
+	parsed, err = parseArgs([]string{"--no-column-filters", "input.csv", "output.html"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.ColumnFilters {
+		t.Error("--no-column-filters did not disable column filters")
+	}
+}

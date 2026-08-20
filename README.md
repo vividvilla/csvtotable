@@ -6,7 +6,7 @@ CSVtoTable converts CSV files into interactive HTML tables.
 - Standalone HTML output that works offline
 - Local files, URLs, standard input, gzip archives, and multi-file input
 - Mobile-responsive table layout
-- Search, sorting, pagination, and virtual scrolling
+- Search, per-column filters, sorting, pagination, and virtual scrolling
 - Copy, CSV, JSON, and print exports
 - User-controlled light and dark themes
 
@@ -45,6 +45,10 @@ The final positional argument is the output file unless `--serve` is used.
 Gzip-compressed input is unpacked automatically, and so is BOM-marked UTF-8 and
 UTF-16 input. Use `--encoding` for other encodings, and `--delimiter` or
 `--quotechar` for custom CSV formats.
+
+Each column gets a filter below the table: a dropdown for columns with few
+distinct values, a text box otherwise. Use `--no-column-filters` to hide the
+row.
 
 Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--pagination` and `--export` disable those

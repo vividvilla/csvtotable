@@ -67,6 +67,21 @@ table.dataTable caption {
   color: #fff;
 }
 
+table.dataTable tfoot th {
+  font-weight: 400;
+  padding: .4rem .5rem;
+}
+.dt-container tfoot input,
+.dt-container tfoot select {
+  border: 1px solid var(--csvtotable-border);
+  border-radius: .25rem;
+  font: inherit;
+  max-width: 20rem;
+  min-width: 0;
+  padding: .25rem .35rem;
+  width: 100%;
+}
+
 @media (max-width: 767px) {
   main { margin: .75rem; }
   .dt-container { font-size: .8125rem; }

@@ -21,6 +21,13 @@ export interface CsvTableOptions {
   columnFilters: boolean;
 }
 
+const icon = (paths: string) =>
+  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${paths}</svg>`;
+const moonIcon = icon('<path d="M13.6 9.7A6 6 0 0 1 6.3 2.4a6 6 0 1 0 7.3 7.3Z" stroke-linejoin="round"/>');
+const sunIcon = icon(
+  '<circle cx="8" cy="8" r="3.1"/><path d="M8 1v1.7M8 13.3V15M1 8h1.7M13.3 8H15M3.1 3.1l1.2 1.2M11.7 11.7l1.2 1.2M12.9 3.1l-1.2 1.2M4.3 11.7l-1.2 1.2" stroke-linecap="round"/>',
+);
+
 const buttons = (DataTable as any).ext.buttons;
 const themeKey = "csvtotable-theme";
 // A column with more distinct values than this gets a text box instead of a dropdown.
@@ -63,7 +70,7 @@ export function setupTheme(selector: string) {
     theme = next;
     document.documentElement.classList.toggle("dark", next === "dark");
     document.documentElement.classList.toggle("light", next === "light");
-    button.textContent = next === "dark" ? "☀" : "☾";
+    button.innerHTML = next === "dark" ? sunIcon : moonIcon;
     button.ariaLabel = `Use ${next === "dark" ? "light" : "dark"} theme`;
     button.title = button.ariaLabel;
     if (!remember) return;

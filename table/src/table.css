@@ -150,6 +150,11 @@ div.dt-container div.dt-buttons > button.dt-button.dt-button-active,
 /* The scrim still closes the menu on an outside click; it just stops dimming
    the whole page for a four-item dropdown. */
 div.dt-button-background { background: transparent; }
+div.dt-container div.dt-buttons span.dt-button-down-arrow {
+  font-size: 8px;
+  opacity: .8;
+  padding-left: 6px;
+}
 div.dt-button-collection {
   background: var(--ct-paper);
   border: 1px solid var(--ct-rule-strong);
@@ -229,6 +234,15 @@ table.dataTable {
   border-collapse: separate;
   border-spacing: 0;
 }
+/* The table's outer text edges line up with the title and the search box
+   instead of sitting a cell-padding inside them. */
+table.dataTable > thead > tr > :first-child,
+table.dataTable > tfoot > tr > :first-child,
+table.dataTable > tbody > tr > :first-child { padding-left: 0; }
+table.dataTable > thead > tr > :last-child,
+table.dataTable > tfoot > tr > :last-child,
+table.dataTable > tbody > tr > :last-child { padding-right: 0; }
+
 table.dataTable > thead > tr > th,
 table.dataTable > thead > tr > td {
   border-bottom: 1px solid var(--ct-rule-strong);
@@ -271,11 +285,17 @@ table.dataTable > tbody > tr > td.dt-type-numeric {
 div.dt-container div.dt-scroll { display: flex; flex-direction: column; }
 div.dt-container div.dt-scroll-head { order: 1; }
 div.dt-container div.dt-scroll-foot { order: 2; }
-div.dt-container div.dt-scroll-body { min-height: 0; order: 3; }
+div.dt-container div.dt-scroll-body {
+  min-height: 0;
+  order: 3;
+  scrollbar-color: var(--ct-rule-strong) transparent;
+  scrollbar-width: thin;
+}
+div.dt-container div.dt-scroll { scrollbar-color: var(--ct-rule-strong) transparent; scrollbar-width: thin; }
 div.dt-container div.dt-scroll-foot { border-top: 0; }
 
 table.dataTable > tfoot > tr > th {
-  border-bottom: 1px solid var(--ct-rule);
+  border-bottom: 1px solid var(--ct-rule-strong);
   border-top: 0;
   font-weight: 400;
   padding: .4rem .5rem .55rem;
@@ -283,8 +303,8 @@ table.dataTable > tfoot > tr > th {
 }
 div.dt-container table.dataTable tfoot input,
 div.dt-container table.dataTable tfoot select {
-  background: var(--ct-paper);
-  border: 1px solid var(--ct-rule);
+  background: var(--ct-hover);
+  border: 1px solid transparent;
   border-radius: 5px;
   color: inherit;
   font: inherit;
@@ -294,9 +314,12 @@ div.dt-container table.dataTable tfoot select {
   padding: .28rem .35rem;
   width: 100%;
 }
-div.dt-container table.dataTable tfoot input::placeholder { color: var(--ct-muted); }
+div.dt-container table.dataTable tfoot input::placeholder { color: var(--ct-muted); opacity: .75; }
+div.dt-container table.dataTable tfoot input:hover,
+div.dt-container table.dataTable tfoot select:hover { border-color: var(--ct-rule-strong); }
 div.dt-container table.dataTable tfoot input:focus,
 div.dt-container table.dataTable tfoot select:focus {
+  background: var(--ct-paper);
   border-color: var(--ct-accent);
   outline: none;
 }

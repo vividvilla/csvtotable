@@ -102,7 +102,7 @@ def main() -> None:
         "version": version,
         "description": f"csvtotable native binary for {target}",
         "license": "MIT",
-        "repository": "https://github.com/vividvilla/csvtotable",
+        "repository": npm_package["repository"],
         "os": [npm_os],
         "cpu": [npm_cpu],
         "files": ["bin"],

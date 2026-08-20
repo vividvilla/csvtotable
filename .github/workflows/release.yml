@@ -105,6 +105,7 @@ jobs:
         working-directory: dist
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
 
   publish-pypi:
     needs: build
@@ -151,5 +152,5 @@ jobs:
           fi
           echo "NPM_TAG=$tag" >> "$GITHUB_ENV"
       - name: Publish native packages
-        run: for package in dist/*.tgz; do npm publish "$package" --access public --provenance --tag "$NPM_TAG"; done
+        run: for package in dist/*.tgz; do npm publish "./$package" --access public --provenance --tag "$NPM_TAG"; done
       - run: npm publish ./npm --access public --provenance --tag "$NPM_TAG"

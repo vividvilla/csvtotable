@@ -3,7 +3,10 @@
   "version": "3.0.0-beta.1",
   "description": "Convert CSV files into searchable and sortable HTML tables",
   "license": "MIT",
-  "repository": "https://github.com/vividvilla/csvtotable",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vividvilla/csvtotable.git"
+  },
   "bin": {
     "csvtotable": "bin/csvtotable.js"
   },

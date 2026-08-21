@@ -15,6 +15,8 @@ CSVtoTable converts CSV and Excel files into interactive HTML tables.
 
 ![CSVtoTable demo](sample/table.gif)
 
+**[Try the live demo](https://vividvilla.github.io/csvtotable/)** — a page built by CSVtoTable from the sample data, served as one static file.
+
 ## Usage
 
 ```sh
@@ -216,6 +218,7 @@ binary.
 nix develop  # optional development environment
 make build   # frontend and build/csvtotable
 make test    # frontend, formatting, vet, and tests
+make demo    # the published demo page under site/
 make dist    # binary and host-platform packages under dist/
 ```
 

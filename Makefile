@@ -2,7 +2,7 @@ VERSION := $(shell sed -n 's/^  "version": "\(.*\)",/\1/p' npm/package.json)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 EXE := $(shell go env GOEXE)
 
-.PHONY: frontend build test dist
+.PHONY: frontend build test dist demo
 
 frontend:
 	cd table && bun install --frozen-lockfile
@@ -16,6 +16,15 @@ test: frontend
 	test -z "$$(gofmt -l *.go)"
 	go vet ./...
 	go test ./...
+
+demo: build
+	mkdir -p site
+	./build/csvtotable$(EXE) --overwrite \
+		--description @demo/description.md \
+		--css sample/custom.css \
+		--page-size 25 \
+		sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv \
+		site/index.html
 
 dist: frontend
 	mkdir -p dist

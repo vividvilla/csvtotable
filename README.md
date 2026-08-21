@@ -60,39 +60,57 @@ csvtotable data.csv data.html --css brand.css --js setup.js
 
 # Read stdin and write stdout
 curl -L https://example.com/data.csv | csvtotable - - > data.html
+
+# Explore all the available options
+csvtotable --help
 ```
 
-Inputs may be local files, `http://` or `https://` URLs, or `-` for standard
-input. When combining inputs, their headers must match; rows shorter than the
-header are padded. With `--no-header`, generated column names are used. The
-final positional argument is the output file unless `--serve` is used.
+## Install
 
-The format is detected from the content, not the file name, so it works for
-URLs and standard input too. Excel workbooks are read from their first
-worksheet. Gzip-compressed input is unpacked automatically, and so is
-BOM-marked UTF-8 and UTF-16 input. Use `--encoding` for other encodings, and
-`--delimiter` or `--quotechar` for custom CSV formats.
+### uvx, pipx, or pip
 
-`--title` and `--description` are rendered as Markdown, with the description
-appearing under the heading. Raw HTML in them is dropped; to pass HTML through,
-use `--title-html` or `--description-html` instead. Either description flag
-accepts `@FILE` to read its content from a file, like `curl`. The browser tab
-uses the plain text of the title.
+Run without installing:
 
-Show a fixed number of rows per page with `--page-size`; the default of `-1`
-shows every row and lets the table scroll.
+```sh
+uvx csvtotable data.csv data.html
+```
 
-`--theme` picks the colour theme the page opens in: `default`, `dark`, `nord`,
-`gruvbox`, `solarized`, or `auto`. `auto` is the default and follows the
-reader's system setting between `default` and `dark`. Every page also carries a
-theme picker in its toolbar, and the reader's choice is remembered for the next
-page they open.
+Or install it:
 
-Each column gets a filter under its header: a dropdown for columns with few
-distinct values, a text box otherwise. Active filters appear as chips below the
-search box, where they can be cleared one at a time or all at once. Use
-`--no-column-filters` to hide the filter row. The toolbar carries an export menu
-and a column show/hide menu; pick a subset of either with `--export-options`.
+```sh
+pipx install csvtotable
+uv tool install csvtotable
+pip install csvtotable  # inside a virtual environment
+```
+
+### npx or npm
+
+```sh
+npx @vividvilla/csvtotable data.csv data.html   # run without installing
+npm install --global @vividvilla/csvtotable     # or install globally
+```
+
+To run a particular published version:
+
+```sh
+uvx csvtotable@X.Y.Z data.csv data.html
+npx @vividvilla/csvtotable@X.Y.Z data.csv data.html
+```
+
+### Homebrew
+
+```sh
+brew install vividvilla/tap/csvtotable
+```
+
+### Standalone binary
+
+Download an archive from [GitHub Releases](https://github.com/vividvilla/csvtotable/releases),
+verify it with `SHA256SUMS`, and place `csvtotable` (`csvtotable.exe` on Windows)
+on your `PATH`.
+
+Prebuilt binaries support Linux x86-64/ARM64, macOS 12+ x86-64/Apple Silicon,
+and Windows 10+ x86-64.
 
 ### Styling
 
@@ -187,53 +205,6 @@ sanitised.
 Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,
 and `--export` still work; the last two disable those features.
-
-## Install
-
-### uvx, pipx, or pip
-
-Run without installing:
-
-```sh
-uvx csvtotable data.csv data.html
-```
-
-Or install it:
-
-```sh
-pipx install csvtotable
-uv tool install csvtotable
-pip install csvtotable  # inside a virtual environment
-```
-
-### npx or npm
-
-```sh
-npx @vividvilla/csvtotable data.csv data.html   # run without installing
-npm install --global @vividvilla/csvtotable     # or install globally
-```
-
-To run a particular published version:
-
-```sh
-uvx csvtotable@X.Y.Z data.csv data.html
-npx @vividvilla/csvtotable@X.Y.Z data.csv data.html
-```
-
-### Homebrew
-
-```sh
-brew install vividvilla/tap/csvtotable
-```
-
-### Standalone binary
-
-Download an archive from [GitHub Releases](https://github.com/vividvilla/csvtotable/releases),
-verify it with `SHA256SUMS`, and place `csvtotable` (`csvtotable.exe` on Windows)
-on your `PATH`.
-
-Prebuilt binaries support Linux x86-64/ARM64, macOS 12+ x86-64/Apple Silicon,
-and Windows 10+ x86-64.
 
 ## Development
 

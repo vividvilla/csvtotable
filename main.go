@@ -68,6 +68,8 @@ type options struct {
 	Encoding        string
 	ColumnFilters   bool
 	Theme           string
+	CSS             string
+	JS              string
 }
 
 type tableOptions struct {
@@ -187,14 +189,16 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.BoolFlag{Name: "preserve-sort", Aliases: []string{"ps"}, Usage: "Preserve input row order", Destination: &parsed.PreserveSort},
 			&cli.StringFlag{Name: "encoding", Usage: "Input character encoding", Destination: &parsed.Encoding},
 			&cli.StringFlag{Name: "theme", Value: "auto", Usage: "Colour theme: " + strings.Join(themes, ", "), Destination: &parsed.Theme},
+			&cli.StringFlag{Name: "css", Usage: "Path to a stylesheet to inline into the page", Destination: &parsed.CSS},
+			&cli.StringFlag{Name: "js", Usage: "Path to a script to inline into the page", Destination: &parsed.JS},
 			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
 		},
 		Action: func(_ context.Context, command *cli.Command) error {
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
-			if !slices.Contains(themes, parsed.Theme) {
-				return fmt.Errorf("invalid theme %q; choose from %s", parsed.Theme, strings.Join(themes, ", "))
+			if !slices.Contains(themes, parsed.Theme) && parsed.CSS == "" {
+				return fmt.Errorf("invalid theme %q; choose from %s, or define your own with --css", parsed.Theme, strings.Join(themes, ", "))
 			}
 			if parsed.Title != "" && parsed.TitleHTML != "" {
 				return errors.New("use either --title or --title-html, not both")
@@ -418,18 +422,43 @@ func convert(cli options, destination io.Writer) error {
 	if err != nil {
 		return err
 	}
+	customCSS, err := readAsset("css", cli.CSS)
+	if err != nil {
+		return err
+	}
+	customJS, err := readAsset("js", cli.JS)
+	if err != nil {
+		return err
+	}
+	styleHTML := ""
+	if strings.TrimSpace(customCSS) != "" {
+		styleHTML = "<style>" + inlineStyle(customCSS) + "</style>\n"
+	}
+	scriptHTML := ""
+	if strings.TrimSpace(customJS) != "" {
+		scriptHTML = "<script>" + inlineScript(customJS) + "</script>\n"
+	}
+
 	themeAttribute := ""
 	if cli.Theme != "" && cli.Theme != "auto" {
 		themeAttribute = ` data-theme="` + html.EscapeString(cli.Theme) + `"`
 	}
+	pickable := themes
+	if !slices.Contains(themes, cli.Theme) && cli.Theme != "" {
+		pickable = append(append([]string{}, themes...), cli.Theme)
+	}
 	themePicker := &strings.Builder{}
 	themePicker.WriteString(`<select class="csvtotable-theme" id="csvtotable-theme" aria-label="Colour theme">`)
-	for _, name := range themes {
+	for _, name := range pickable {
 		selected := ""
 		if name == cli.Theme || (cli.Theme == "" && name == "auto") {
 			selected = " selected"
 		}
-		fmt.Fprintf(themePicker, `<option value="%s"%s>%s</option>`, name, selected, strings.ToUpper(name[:1])+name[1:])
+		label := name
+		if runes := []rune(name); len(runes) > 0 {
+			label = strings.ToUpper(string(runes[0])) + string(runes[1:])
+		}
+		fmt.Fprintf(themePicker, `<option value="%s"%s>%s</option>`, html.EscapeString(name), selected, html.EscapeString(label))
 	}
 	themePicker.WriteString("</select>")
 
@@ -481,7 +510,7 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\"%s>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main class=\"csvtotable\">\n%s%s\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", themeAttribute, html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headerHTML, themePicker.String(), tableLabel, headersJSON)
+		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\"%s>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n%s</head>\n<body>\n<main class=\"csvtotable\">\n%s%s\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", themeAttribute, html.EscapeString(title), inlineStyle(tableCSS), styleHTML, headerHTML, themePicker.String(), tableLabel, headersJSON)
 		started = err == nil
 		return err
 	}
@@ -577,7 +606,7 @@ func convert(cli options, destination io.Writer) error {
 		}
 	}
 
-	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n<script>%s</script>\n<script>CsvToTable.setupTheme(\"#csvtotable-theme\");CsvToTable.createCsvTable(\"#csvtotable-table\",JSON.parse(document.getElementById(\"csvtotable-data\").textContent),JSON.parse(document.getElementById(\"csvtotable-options\").textContent));</script>\n</body>\n</html>\n", optionsJSON, strings.ReplaceAll(tableJS, "</script", "<\\/script")); err != nil {
+	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n<script>%s</script>\n<script>CsvToTable.setupTheme(\"#csvtotable-theme\");CsvToTable.table=CsvToTable.createCsvTable(\"#csvtotable-table\",JSON.parse(document.getElementById(\"csvtotable-data\").textContent),JSON.parse(document.getElementById(\"csvtotable-options\").textContent));</script>\n%s</body>\n</html>\n", optionsJSON, inlineScript(tableJS), scriptHTML); err != nil {
 		return err
 	}
 	return output.Flush()
@@ -614,7 +643,21 @@ func readText(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(content), nil
+	return strings.TrimPrefix(string(content), "\ufeff"), nil
+}
+
+// readAsset loads an asset file named by a flag. The value is a path; a leading
+// @ is accepted for symmetry with --description but carries no meaning, since
+// these flags never take literal text.
+func readAsset(flag, path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	content, err := readText("@" + strings.TrimPrefix(path, "@"))
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", flag, err)
+	}
+	return content, nil
 }
 
 // renderMarkdown converts Markdown to HTML. Goldmark drops raw HTML unless it is
@@ -642,6 +685,34 @@ func renderInlineMarkdown(source string) (string, error) {
 }
 
 var markupTag = regexp.MustCompile(`<[^>]*>`)
+
+// The HTML tokenizer matches end tags case-insensitively, so a plain
+// strings.ReplaceAll of "</script" leaves "</SCRIPT>" free to close the
+// element. Case is preserved in the replacement so string literals keep their
+// value.
+var (
+	scriptEndTag = regexp.MustCompile(`(?i)</script`)
+	styleEndTag  = regexp.MustCompile(`(?i)</style`)
+)
+
+func escapeEndTag(pattern *regexp.Regexp, source string) string {
+	return pattern.ReplaceAllStringFunc(source, func(match string) string {
+		return "<\\" + match[1:]
+	})
+}
+
+// inlineScript makes arbitrary JavaScript safe to sit inside a <script>
+// element. Besides the end tag, "<!--" puts the tokenizer into an escaped
+// state in which a later "<script" switches it to double-escaped, where
+// "</script>" no longer closes the element and the rest of the document is
+// swallowed. Escaping "<!--" costs only the Annex B HTML comment syntax.
+func inlineScript(source string) string {
+	return strings.ReplaceAll(escapeEndTag(scriptEndTag, source), "<!--", `<\!--`)
+}
+
+func inlineStyle(source string) string {
+	return escapeEndTag(styleEndTag, source)
+}
 
 // plainText reduces generated markup to the text used for the document title.
 func plainText(markup string) string {

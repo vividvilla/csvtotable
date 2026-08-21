@@ -11,6 +11,7 @@ CSVtoTable converts CSV and Excel files into interactive HTML tables.
 - Copy, CSV, JSON, and print exports, plus column show/hide
 - Markdown or raw HTML in the page title and description
 - Five colour themes, pickable in the page or fixed with `--theme`
+- Custom CSS and JavaScript inlined into the page with `--css` and `--js`
 
 ![CSVtoTable demo](sample/table.gif)
 
@@ -53,6 +54,9 @@ csvtotable data.csv data.html --page-size 50
 
 # Open in a particular theme
 csvtotable data.csv data.html --theme solarized
+
+# Add your own CSS and JavaScript
+csvtotable data.csv data.html --css brand.css --js setup.js
 
 # Read stdin and write stdout
 curl -L https://example.com/data.csv | csvtotable - - > data.html
@@ -134,6 +138,51 @@ description headings at `##` to keep one `<h1>` per page.
 Nothing is styled through an ID, so a stylesheet loaded after the page's own
 `<style>` overrides any of the above with a single class selector. Classes
 beginning `dt-` come from DataTables and may change when it is upgraded.
+
+### Custom CSS and JavaScript
+
+`--css` and `--js` inline a stylesheet and a script into the page, keeping the
+output a single self-contained file. Both take a file path:
+
+```sh
+csvtotable data.csv data.html --css brand.css --js setup.js
+```
+
+A leading `@` is accepted too, for symmetry with `--description`, but means
+nothing here: `--css @brand.css` and `--css brand.css` are the same.
+
+Placement is what makes them useful. The stylesheet goes last in `<head>`, after
+the built-in one, so a single class selector overrides anything above without
+`!important`. The script goes last in `<body>`, after the table is built, and
+`CsvToTable.table` holds the live [DataTables API](https://datatables.net/reference/api/)
+instance:
+
+```js
+CsvToTable.table.order([2, "desc"]).draw();   // sort by the third column
+CsvToTable.table.column(0).visible(false);    // hide the first column
+```
+
+The table's height is fitted on the next animation frame, so a script that
+measures layout should wrap the read in `requestAnimationFrame`. Column widths
+and the scroll height are set as inline styles, which a stylesheet cannot
+override — use `--height` for that.
+
+A whole new palette is a stylesheet plus a matching `--theme`. The name does not
+have to be one of the built-ins as long as `--css` defines it, and the page's
+theme picker will list it alongside them:
+
+```sh
+csvtotable data.csv data.html --css custom.css --theme tokyonight
+```
+
+Selecting "Auto" in the picker unpins `data-theme` and falls back to the
+built-in light and dark palettes, so put anything that should survive that in
+`:root` or a class rule and keep `[data-theme]` blocks for the palette itself.
+
+Both flags are trusted input: whatever the files contain runs for anyone who
+opens the page, so do not generate them from untrusted data. Content is escaped only
+so it cannot break out of its `<style>` or `<script>` element; it is not
+sanitised.
 
 Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,

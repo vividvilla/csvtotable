@@ -49,9 +49,34 @@ buttons.json = {
 // A theme is a [data-theme] block of variables in the stylesheet, so switching
 // is just swapping the attribute; "auto" removes it and lets the stylesheet's
 // media query follow the system.
+// Themes a --css stylesheet defines are only reachable if the picker lists
+// them, and Go only knows about the one named by --theme.
+function discoverThemes(picker: HTMLSelectElement) {
+  const known = new Set([...picker.options].map((option) => option.value));
+  for (const sheet of document.styleSheets) {
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // a cross-origin sheet, which cannot define our themes anyway
+    }
+    for (const rule of rules) {
+      const selector = (rule as CSSStyleRule).selectorText;
+      if (!selector) continue;
+      for (const [, name] of selector.matchAll(/\[data-theme=["']?([^"'\]]+)["']?\]/g)) {
+        if (known.has(name)) continue;
+        known.add(name);
+        picker.add(new Option(name.charAt(0).toUpperCase() + name.slice(1), name));
+      }
+    }
+  }
+}
+
 export function setupTheme(selector: string) {
   const picker = document.querySelector<HTMLSelectElement>(selector);
   if (!picker) return;
+
+  discoverThemes(picker);
 
   const apply = (theme: string) => {
     if (theme === "auto") delete document.documentElement.dataset.theme;

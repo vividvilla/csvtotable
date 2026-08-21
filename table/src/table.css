@@ -5,7 +5,9 @@
 
    default and dark are also the system pair: with no data-theme pinned the
    media query below picks between them before any script runs, which is why
-   their values appear twice. (light-dark() would collapse that, but the CSS
+   their values appear twice. That block wraps its :not() in :where() so it
+   weighs no more than a plain :root, or a --css override of the palette would
+   lose to it in dark mode. (light-dark() would collapse that, but the CSS
    bundler rewrites it into a prefers-color-scheme toggle that ignores an
    explicit choice.) */
 :root,
@@ -34,7 +36,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+  :root:where(:not([data-theme])) {
     color-scheme: dark;
     --ct-paper: #101317;
     --ct-ink: #e7eaee;

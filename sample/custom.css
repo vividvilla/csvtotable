@@ -1,0 +1,26 @@
+/*
+ * Sample --css for csvtotable: a custom theme.
+ *
+ *   csvtotable sample/meteorite-landings-1.csv out.html \
+ *     --theme tokyonight \
+ *     --css sample/custom.css \
+ *     --js sample/custom.js
+ *
+ * A theme is only a block of variables. --theme accepts a name the built-in
+ * stylesheet has never heard of as long as --css defines it, and the page's
+ * theme picker lists it alongside the built-ins. Leave --theme off and the
+ * theme is still there to pick from the menu.
+ *
+ * Palette: Tokyo Night — https://github.com/folke/tokyonight.nvim
+ */
+[data-theme="tokyonight"] {
+  color-scheme: dark;         /* so scrollbars and dropdowns match */
+  --ct-paper: #1a1b26;        /* page background */
+  --ct-ink: #c0caf5;          /* body text */
+  --ct-muted: #7f88b0;        /* labels, secondary text */
+  --ct-rule: #232433;         /* row separators */
+  --ct-rule-strong: #343b58;  /* header underline, input borders */
+  --ct-accent: #7aa2f7;       /* focus, active sort, filter chips */
+  --ct-wash: #1f2335;         /* accent tint behind chips */
+  --ct-hover: #1e2030;        /* row and control hover */
+}

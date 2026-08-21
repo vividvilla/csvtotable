@@ -617,3 +617,219 @@ func TestThemes(t *testing.T) {
 		t.Error("an unknown theme was accepted")
 	}
 }
+
+func TestCustomCSSAndJS(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	write := func(name, content string) string {
+		path := filepath.Join(directory, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	css, js := ".csvtotable-title{color:red}", "CsvToTable.table.draw()"
+
+	cli := base
+	cli.CSS = write("custom.css", css)
+	cli.JS = write("custom.js", js)
+	var rendered bytes.Buffer
+	if err := convert(cli, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+
+	// Placement is the whole feature: CSS after the built-in sheet so it wins
+	// on equal specificity, JS after the bootstrap so the table exists.
+	style := strings.Index(page, "<style>"+css+"</style>")
+	if style < 0 {
+		t.Fatal("custom CSS was not emitted")
+	}
+	if style < strings.Index(page, "<style>:root") || style > strings.Index(page, "</head>") {
+		t.Error("custom CSS is not the last thing in <head>")
+	}
+	script := strings.Index(page, "<script>"+js+"</script>")
+	if script < 0 {
+		t.Fatal("custom JS was not emitted")
+	}
+	if script < strings.Index(page, "CsvToTable.table=CsvToTable.createCsvTable") {
+		t.Error("custom JS runs before the table is built")
+	}
+	if script > strings.Index(page, "</body>") {
+		t.Error("custom JS is outside <body>")
+	}
+
+	// User content must not be able to close the tag it sits in.
+	breakout := base
+	breakout.CSS = write("breakout.css", "</style><b>x")
+	breakout.JS = write("breakout.js", "</script><b>x")
+	rendered.Reset()
+	if err := convert(breakout, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page = rendered.String()
+	if strings.Contains(page, "<style></style>") || strings.Contains(page, "<script></script>") {
+		t.Error("custom content broke out of its tag")
+	}
+	for _, want := range []string{`<\/style`, `<\/script`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("custom content is missing the %s escape", want)
+		}
+	}
+
+	// A leading @ is tolerated for symmetry with --description but means
+	// nothing here, so both spellings must produce the same page.
+	stylesheet := write("extra.css", ".from-file{color:blue}")
+	var plain, prefixed bytes.Buffer
+	bare, at := base, base
+	bare.CSS, at.CSS = stylesheet, "@"+stylesheet
+	if err := convert(bare, &plain); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(at, &prefixed); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plain.String(), ".from-file{color:blue}") {
+		t.Error("stylesheet was not inlined")
+	}
+	if plain.String() != prefixed.String() {
+		t.Error("a leading @ changed the output")
+	}
+	for flag, cli := range map[string]options{
+		"css": {InputFiles: []string{input}, Delimiter: ",", Quote: "\"", CSS: filepath.Join(directory, "absent.css")},
+		"js":  {InputFiles: []string{input}, Delimiter: ",", Quote: "\"", JS: filepath.Join(directory, "absent.js")},
+	} {
+		if err := convert(cli, io.Discard); err == nil || !strings.HasPrefix(err.Error(), flag+":") {
+			t.Errorf("missing %s file gave %v", flag, err)
+		}
+	}
+
+	// Nothing is emitted when the flags are unused.
+	rendered.Reset()
+	if err := convert(base, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), "<style></style>") || strings.Contains(rendered.String(), "<script></script>") {
+		t.Error("empty custom CSS or JS emitted a bare tag")
+	}
+}
+
+func TestCustomTheme(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A palette the stylesheet has never heard of is fine as long as --css can
+	// supply it, and the picker has to offer it or it would report the wrong
+	// theme with no way back.
+	stylesheet := filepath.Join(directory, "tokyonight.css")
+	if err := os.WriteFile(stylesheet, []byte(`[data-theme="tokyonight"]{--ct-paper:#1a1b26}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	custom := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\"",
+		Theme: "tokyonight", CSS: stylesheet}
+	var rendered bytes.Buffer
+	if err := convert(custom, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<html lang="en" data-theme="tokyonight">`,
+		`<option value="tokyonight" selected>Tokyonight</option>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("custom-themed page is missing %s", want)
+		}
+	}
+
+	if _, err := parseArgs([]string{"--theme", "tokyonight", "--css", stylesheet, input, "out.html"}); err != nil {
+		t.Errorf("--theme with --css was rejected: %v", err)
+	}
+	if _, err := parseArgs([]string{"--theme", "tokyonight", input, "out.html"}); err == nil {
+		t.Error("an unknown theme was accepted without --css")
+	}
+}
+
+func TestInlineAssetEscaping(t *testing.T) {
+	// The HTML tokenizer matches end tags case-insensitively, and "<!--"
+	// followed by "<script" switches it to a state where "</script>" no longer
+	// closes the element. Both silently swallowed the rest of the document.
+	for _, source := range []string{`x="</SCRIPT>"`, `x="</ScRiPt >"`, `a="<!--"; b="<script /"`} {
+		escaped := inlineScript(source)
+		if scriptEndTag.MatchString(strings.ReplaceAll(escaped, `<\/`, "")) {
+			t.Errorf("inlineScript left a live end tag in %q -> %q", source, escaped)
+		}
+		if strings.Contains(escaped, "<!--") {
+			t.Errorf("inlineScript left a comment opener in %q -> %q", source, escaped)
+		}
+	}
+	// Case is preserved so string literals keep their value.
+	if got := inlineScript(`"</SCRIPT>"`); got != `"<\/SCRIPT>"` {
+		t.Errorf("inlineScript changed the case of the end tag: %q", got)
+	}
+	if got := inlineStyle(`a{content:"</STYLE>"}`); !strings.Contains(got, `<\/STYLE>`) {
+		t.Errorf("inlineStyle did not escape an uppercase end tag: %q", got)
+	}
+
+	// The embedded assets carry the same hazard, not just user content.
+	for name, asset := range map[string]string{"css": tableCSS, "js": tableJS} {
+		if strings.Contains(name, "js") && strings.Contains(inlineScript(asset), "<!--") {
+			t.Error("embedded bundle still contains a comment opener after escaping")
+		}
+	}
+
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A custom theme name reaches the picker markup and must be escaped.
+	var rendered bytes.Buffer
+	hostile := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\"",
+		Theme: `"><script>alert(1)</script>`, CSS: filepath.Join(directory, "theme.css")}
+	if err := os.WriteFile(hostile.CSS, []byte("x{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(hostile, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), `<option value=""><script>`) {
+		t.Error("a theme name broke out of the picker option")
+	}
+
+}
+
+func TestPaletteOverrideSpecificity(t *testing.T) {
+	// The auto-dark block must not out-weigh a plain :root rule, or a --css
+	// palette override is silently ignored on a dark-mode machine.
+	if strings.Contains(tableCSS, ":root:not([data-theme])") {
+		t.Error("the auto-dark palette outweighs a :root override; wrap its :not() in :where()")
+	}
+	if !strings.Contains(tableCSS, ":root:where(:not([data-theme]))") {
+		t.Error("the auto-dark palette no longer scopes itself to unpinned pages")
+	}
+}
+
+func TestCustomThemeIsDiscoverable(t *testing.T) {
+	// A --css theme is only reachable if the picker lists it. Go names the one
+	// passed to --theme; the frontend finds the rest by reading the stylesheet,
+	// so both halves have to agree on the attribute spelling.
+	if !strings.Contains(tableJS, "data-theme=") {
+		t.Error("the bundle no longer looks for [data-theme] blocks in loaded stylesheets")
+	}
+	for _, name := range themes {
+		if name == "auto" {
+			continue
+		}
+		if !strings.Contains(tableCSS, "[data-theme="+name+"]") {
+			t.Errorf("stylesheet has no block for theme %q", name)
+		}
+	}
+}

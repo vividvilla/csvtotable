@@ -10,7 +10,7 @@ CSVtoTable converts CSV and Excel files into interactive HTML tables.
 - Search, per-column filters with active-filter chips, sorting, and virtual scrolling
 - Copy, CSV, JSON, and print exports, plus column show/hide
 - Markdown or raw HTML in the page title and description
-- Light and dark themes that follow the system and remember a manual choice
+- Five colour themes, pickable in the page or fixed with `--theme`
 
 ![CSVtoTable demo](sample/table.gif)
 
@@ -51,6 +51,9 @@ csvtotable data.csv data.html --title-html '<span>Sales <b>Q3</b></span>' --desc
 # Paginate instead of showing every row
 csvtotable data.csv data.html --page-size 50
 
+# Open in a particular theme
+csvtotable data.csv data.html --theme solarized
+
 # Read stdin and write stdout
 curl -L https://example.com/data.csv | csvtotable - - > data.html
 ```
@@ -75,6 +78,12 @@ uses the plain text of the title.
 Show a fixed number of rows per page with `--page-size`; the default of `-1`
 shows every row and lets the table scroll.
 
+`--theme` picks the colour theme the page opens in: `default`, `dark`, `nord`,
+`gruvbox`, `solarized`, or `auto`. `auto` is the default and follows the
+reader's system setting between `default` and `dark`. Every page also carries a
+theme picker in its toolbar, and the reader's choice is remembered for the next
+page they open.
+
 Each column gets a filter under its header: a dropdown for columns with few
 distinct values, a text box otherwise. Active filters appear as chips below the
 search box, where they can be cleared one at a time or all at once. Use
@@ -93,16 +102,33 @@ The page is plain semantic HTML, and every element CSVtoTable owns carries a
 | `.csvtotable-title` | `<h1>` page heading |
 | `.csvtotable-description` | description block |
 | `.csvtotable-table` | the `<table>` |
-| `.csvtotable-theme` | light/dark toggle |
+| `.csvtotable-theme` | theme picker |
 | `.csvtotable-filters` | active-filter chip row |
 | `.csvtotable-chip` | one active filter, with `-key`, `-value`, and `-remove` parts |
 | `.csvtotable-clear` | the "clear all" control |
 
-Sizes and colours resolve through custom properties on `:root` — `--ct-accent`,
-`--ct-paper`, `--ct-ink`, `--ct-muted`, `--ct-rule`, the `--ct-text-*` scale, and
-`--ct-sans`/`--ct-mono` — so retheming usually means redefining a few of those
-rather than writing rules. Headings are styled by level (`h1` to `h6`), so a
-Markdown heading in a description matches the same level elsewhere; start
+A theme is nothing but a block of colour variables. Every rule in the
+stylesheet reads them, so a new theme is a copy of one block with different
+values — no rules to write and nothing else to touch:
+
+```css
+[data-theme="my-theme"] {
+  color-scheme: dark;      /* so scrollbars and dropdowns match */
+  --ct-paper: #1a1b26;     /* page background */
+  --ct-ink: #c0caf5;       /* body text */
+  --ct-muted: #7f88b0;     /* labels, secondary text */
+  --ct-rule: #232433;      /* row separators */
+  --ct-rule-strong: #343b58;
+  --ct-accent: #7aa2f7;    /* focus, active sort, filter chips */
+  --ct-wash: #1f2335;      /* accent tint behind chips */
+  --ct-hover: #1e2030;     /* row and control hover */
+}
+```
+
+Switching themes is just swapping `data-theme` on `<html>`. Type and metrics sit
+outside the palettes in the `--ct-text-*` scale and `--ct-sans`/`--ct-mono`,
+since they do not vary by theme. Headings are styled by level (`h1` to `h6`), so
+a Markdown heading in a description matches the same level elsewhere; start
 description headings at `##` to keep one `<h1>` per page.
 
 Nothing is styled through an ID, so a stylesheet loaded after the page's own

@@ -1,7 +1,15 @@
-/* Light is the base palette; dark follows the system unless the reader picks a
-   theme, so a system-dark reader never gets a flash of light before the script
-   runs. */
-:root {
+/* A theme is nothing but a block of colour variables. Everything else in this
+   sheet reads them, so adding one means copying a block and changing values.
+   color-scheme comes along so native controls — scrollbars, dropdowns, the
+   caret — match the palette.
+
+   default and dark are also the system pair: with no data-theme pinned the
+   media query below picks between them before any script runs, which is why
+   their values appear twice. (light-dark() would collapse that, but the CSS
+   bundler rewrites it into a prefers-color-scheme toggle that ignores an
+   explicit choice.) */
+:root,
+[data-theme="default"] {
   color-scheme: light;
   --ct-paper: #fff;
   --ct-ink: #15181d;
@@ -11,6 +19,75 @@
   --ct-accent: #004da8;
   --ct-wash: #eaf1fc;
   --ct-hover: #f4f6f8;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ct-paper: #101317;
+  --ct-ink: #e7eaee;
+  --ct-muted: #98a0ab;
+  --ct-rule: #252a32;
+  --ct-rule-strong: #39414c;
+  --ct-accent: #74abf7;
+  --ct-wash: #15243a;
+  --ct-hover: #191d24;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --ct-paper: #101317;
+    --ct-ink: #e7eaee;
+    --ct-muted: #98a0ab;
+    --ct-rule: #252a32;
+    --ct-rule-strong: #39414c;
+    --ct-accent: #74abf7;
+    --ct-wash: #15243a;
+    --ct-hover: #191d24;
+  }
+}
+
+/* Nord — https://www.nordtheme.com */
+[data-theme="nord"] {
+  color-scheme: dark;
+  --ct-paper: #2e3440;
+  --ct-ink: #eceff4;
+  --ct-muted: #a3aec2;
+  --ct-rule: #3b4252;
+  --ct-rule-strong: #4c566a;
+  --ct-accent: #88c0d0;
+  --ct-wash: #3b4252;
+  --ct-hover: #363e4d;
+}
+
+/* Gruvbox dark — https://github.com/morhetz/gruvbox */
+[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --ct-paper: #282828;
+  --ct-ink: #ebdbb2;
+  --ct-muted: #a89984;
+  --ct-rule: #3c3836;
+  --ct-rule-strong: #504945;
+  --ct-accent: #fabd2f;
+  --ct-wash: #3c3836;
+  --ct-hover: #32302f;
+}
+
+/* Solarized light — https://ethanschoonover.com/solarized */
+[data-theme="solarized"] {
+  color-scheme: light;
+  --ct-paper: #fdf6e3;
+  --ct-ink: #073642;
+  --ct-muted: #657b83;
+  --ct-rule: #eee8d5;
+  --ct-rule-strong: #d8d0b8;
+  --ct-accent: #268bd2;
+  --ct-wash: #e9e2cd;
+  --ct-hover: #f5eeda;
+}
+
+/* Type and metrics are theme-independent, so they live outside the palettes. */
+:root {
   --ct-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --ct-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ct-text-2xs: .6875rem;
@@ -21,35 +98,6 @@
   --ct-text-lg: 1.125rem;
   --ct-text-xl: 1.375rem;
   --ct-text-2xl: 1.75rem;
-  --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2361666e' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --ct-paper: #101317;
-    --ct-ink: #e7eaee;
-    --ct-muted: #98a0ab;
-    --ct-rule: #252a32;
-    --ct-rule-strong: #39414c;
-    --ct-accent: #74abf7;
-    --ct-wash: #15243a;
-    --ct-hover: #191d24;
-    --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a0ab' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
-  }
-}
-
-:root.dark {
-  color-scheme: dark;
-  --ct-paper: #101317;
-  --ct-ink: #e7eaee;
-  --ct-muted: #98a0ab;
-  --ct-rule: #252a32;
-  --ct-rule-strong: #39414c;
-  --ct-accent: #74abf7;
-  --ct-wash: #15243a;
-  --ct-hover: #191d24;
-  --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a0ab' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
 }
 
 /* Sort carets ride DataTables' own tokens rather than duplicated selectors. */
@@ -133,8 +181,21 @@ div.dt-container div.dt-layout-row.dt-layout-table ~ div.dt-layout-row { margin:
 div.dt-container div.dt-layout-start > *:not(:last-child) { margin-right: .9rem; }
 div.dt-container div.dt-layout-end > *:not(:first-child) { margin-left: .3rem; }
 
+div.dt-container div.dt-search { position: relative; }
+div.dt-container div.dt-search::before {
+  background-color: var(--ct-muted);
+  content: "";
+  height: 14px;
+  left: .65rem;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>") no-repeat center / contain;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+}
 div.dt-container div.dt-search input {
-  background: var(--ct-paper) var(--ct-search-icon) no-repeat .65rem center / 14px;
+  background: var(--ct-paper);
   border: 1px solid var(--ct-rule-strong);
   border-radius: 7px;
   color: inherit;
@@ -183,13 +244,12 @@ div.dt-container div.dt-buttons > button.dt-button.dt-button-active,
   border-color: transparent;
   color: var(--ct-ink);
 }
+/* The picker keeps the ghost look of the toolbar buttons, with just enough
+   chrome to read as a control. */
 .csvtotable-theme {
-  display: grid;
-  height: 2.05rem;
-  padding: 0;
-  place-items: center;
-  width: 2.05rem;
+  padding-right: .35rem;
 }
+.csvtotable-theme:focus-visible { border-color: var(--ct-accent); }
 /* The scrim still closes the menu on an outside click; it just stops dimming
    the whole page for a four-item dropdown. */
 div.dt-button-background { background: transparent; }

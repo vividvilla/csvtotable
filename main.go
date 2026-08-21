@@ -42,6 +42,10 @@ var version = "dev"
 
 const stdioArgument = "\x00"
 
+// themes must match the [data-theme] blocks in table/src/table.css. "auto"
+// pins nothing, leaving the stylesheet to follow the system.
+var themes = []string{"auto", "default", "dark", "nord", "gruvbox", "solarized"}
+
 type options struct {
 	InputFiles      []string
 	OutputFile      string
@@ -63,6 +67,7 @@ type options struct {
 	PreserveSort    bool
 	Encoding        string
 	ColumnFilters   bool
+	Theme           string
 }
 
 type tableOptions struct {
@@ -181,12 +186,16 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.StringSliceFlag{Name: "export-options", Aliases: []string{"eo"}, Usage: "Toolbar button: copy, csv, json, print, or colvis; may be repeated", Destination: &parsed.ExportOptions},
 			&cli.BoolFlag{Name: "preserve-sort", Aliases: []string{"ps"}, Usage: "Preserve input row order", Destination: &parsed.PreserveSort},
 			&cli.StringFlag{Name: "encoding", Usage: "Input character encoding", Destination: &parsed.Encoding},
+			&cli.StringFlag{Name: "theme", Value: "auto", Usage: "Colour theme: " + strings.Join(themes, ", "), Destination: &parsed.Theme},
 			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
 		},
 		Action: func(_ context.Context, command *cli.Command) error {
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
+			if !slices.Contains(themes, parsed.Theme) {
+				return fmt.Errorf("invalid theme %q; choose from %s", parsed.Theme, strings.Join(themes, ", "))
+			}
 			if parsed.Title != "" && parsed.TitleHTML != "" {
 				return errors.New("use either --title or --title-html, not both")
 			}
@@ -409,6 +418,21 @@ func convert(cli options, destination io.Writer) error {
 	if err != nil {
 		return err
 	}
+	themeAttribute := ""
+	if cli.Theme != "" && cli.Theme != "auto" {
+		themeAttribute = ` data-theme="` + html.EscapeString(cli.Theme) + `"`
+	}
+	themePicker := &strings.Builder{}
+	themePicker.WriteString(`<select class="csvtotable-theme" id="csvtotable-theme" aria-label="Colour theme">`)
+	for _, name := range themes {
+		selected := ""
+		if name == cli.Theme || (cli.Theme == "" && name == "auto") {
+			selected = " selected"
+		}
+		fmt.Fprintf(themePicker, `<option value="%s"%s>%s</option>`, name, selected, strings.ToUpper(name[:1])+name[1:])
+	}
+	themePicker.WriteString("</select>")
+
 	title := plainText(heading)
 	if title == "" {
 		title = "Table"
@@ -457,7 +481,7 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main class=\"csvtotable\">\n%s<button class=\"csvtotable-theme\" id=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\"></button>\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headerHTML, tableLabel, headersJSON)
+		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\"%s>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main class=\"csvtotable\">\n%s%s\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", themeAttribute, html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headerHTML, themePicker.String(), tableLabel, headersJSON)
 		started = err == nil
 		return err
 	}

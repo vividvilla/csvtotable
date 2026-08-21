@@ -44,7 +44,7 @@ func TestConverterCompatibility(t *testing.T) {
 		"<title>&lt;Table&gt;</title>",
 		"<h1 class=\"csvtotable-title\" id=\"csvtotable-title\">&lt;Table&gt;</h1>",
 		`aria-labelledby="csvtotable-title"`,
-		"<button class=\"csvtotable-theme\" id=\"csvtotable-theme\"",
+		"<select class=\"csvtotable-theme\" id=\"csvtotable-theme\"",
 		"CsvToTable.setupTheme(\"#csvtotable-theme\")",
 		`"headers":["name","value"]`,
 		`"pagination":false`,
@@ -553,5 +553,67 @@ func TestWorkbookInput(t *testing.T) {
 	}
 	if err := convert(options{InputFiles: []string{notWorkbook}, Delimiter: ",", Quote: "\""}, io.Discard); err == nil {
 		t.Error("a corrupt workbook was accepted")
+	}
+}
+
+func TestThemes(t *testing.T) {
+	// The CLI list and the stylesheet's [data-theme] blocks have to agree, or
+	// --theme silently produces an unstyled page.
+	for _, name := range themes {
+		if name == "auto" {
+			continue
+		}
+		// The minifier drops the attribute-value quotes.
+		if !strings.Contains(tableCSS, "[data-theme="+name+"]") {
+			t.Errorf("stylesheet has no block for theme %q", name)
+		}
+	}
+
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	named := base
+	named.Theme = "nord"
+	var rendered bytes.Buffer
+	if err := convert(named, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<html lang="en" data-theme="nord">`,
+		`<option value="nord" selected>Nord</option>`,
+		`<select class="csvtotable-theme" id="csvtotable-theme" aria-label="Colour theme">`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("themed page is missing %s", want)
+		}
+	}
+
+	// "auto" pins nothing, leaving the stylesheet to follow the system.
+	auto := base
+	auto.Theme = "auto"
+	rendered.Reset()
+	if err := convert(auto, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	// The stylesheet itself is full of [data-theme=...] selectors, so look at
+	// the root element specifically.
+	if strings.Contains(rendered.String(), `<html lang="en" data-theme=`) {
+		t.Error("auto pinned a theme on the root element")
+	}
+
+	parsed, err := parseArgs([]string{"--theme", "gruvbox", input, "out.html"})
+	if err != nil || parsed.Theme != "gruvbox" {
+		t.Fatalf("--theme gruvbox failed: %+v, %v", parsed, err)
+	}
+	if parsed, err := parseArgs([]string{input, "out.html"}); err != nil || parsed.Theme != "auto" {
+		t.Fatalf("theme did not default to auto: %+v, %v", parsed, err)
+	}
+	if _, err := parseArgs([]string{"--theme", "bogus", input, "out.html"}); err == nil {
+		t.Error("an unknown theme was accepted")
 	}
 }

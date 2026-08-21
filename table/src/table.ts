@@ -21,13 +21,6 @@ export interface CsvTableOptions {
   columnFilters: boolean;
 }
 
-const icon = (paths: string) =>
-  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${paths}</svg>`;
-const moonIcon = icon('<path d="M13.6 9.7A6 6 0 0 1 6.3 2.4a6 6 0 1 0 7.3 7.3Z" stroke-linejoin="round"/>');
-const sunIcon = icon(
-  '<circle cx="8" cy="8" r="3.1"/><path d="M8 1v1.7M8 13.3V15M1 8h1.7M13.3 8H15M3.1 3.1l1.2 1.2M11.7 11.7l1.2 1.2M12.9 3.1l-1.2 1.2M4.3 11.7l-1.2 1.2" stroke-linecap="round"/>',
-);
-
 const buttons = (DataTable as any).ext.buttons;
 const themeKey = "csvtotable-theme";
 // A column with more distinct values than this gets a text box instead of a dropdown.
@@ -53,36 +46,35 @@ buttons.json = {
   },
 };
 
+// A theme is a [data-theme] block of variables in the stylesheet, so switching
+// is just swapping the attribute; "auto" removes it and lets the stylesheet's
+// media query follow the system.
 export function setupTheme(selector: string) {
-  const button = document.querySelector<HTMLButtonElement>(selector);
-  if (!button) return;
+  const picker = document.querySelector<HTMLSelectElement>(selector);
+  if (!picker) return;
+
+  const apply = (theme: string) => {
+    if (theme === "auto") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+  };
 
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(themeKey);
   } catch {}
-  let theme: "light" | "dark" =
-    stored === "dark" || stored === "light"
-      ? stored
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
+  // A stored choice wins over the page's built-in theme, but only if it names
+  // one this page actually has.
+  if (stored && [...picker.options].some((option) => option.value === stored)) {
+    picker.value = stored;
+    apply(stored);
+  }
 
-  const apply = (next: "light" | "dark", remember: boolean) => {
-    theme = next;
-    document.documentElement.classList.toggle("dark", next === "dark");
-    document.documentElement.classList.toggle("light", next === "light");
-    button.innerHTML = next === "dark" ? sunIcon : moonIcon;
-    button.ariaLabel = `Use ${next === "dark" ? "light" : "dark"} theme`;
-    button.title = button.ariaLabel;
-    if (!remember) return;
+  picker.addEventListener("change", () => {
+    apply(picker.value);
     try {
-      localStorage.setItem(themeKey, next);
+      localStorage.setItem(themeKey, picker.value);
     } catch {}
-  };
-
-  apply(theme, false);
-  button.addEventListener("click", () => apply(theme === "dark" ? "light" : "dark", true));
+  });
 }
 
 function chip(key: string, value: string, onRemove: () => void) {

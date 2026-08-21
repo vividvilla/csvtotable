@@ -171,6 +171,17 @@ code {
 .csvtotable-description ol { padding-left: 1.1rem; }
 .csvtotable-description a { color: var(--ct-accent); }
 
+/* Shown only when the compressed bundle cannot be inflated, so the reader gets
+   a reason instead of an empty page. */
+.csvtotable-error {
+  margin: 0 0 1.1rem;
+  padding: .7rem .9rem;
+  border-left: 3px solid var(--ct-accent);
+  background: var(--ct-wash);
+  color: var(--ct-muted);
+  font-size: var(--ct-text-base);
+}
+
 /* Toolbar ------------------------------------------------------------- */
 
 div.dt-container { color: var(--ct-ink); font-size: var(--ct-text-base); }

@@ -3,7 +3,7 @@
 CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 
 - Single native binary with embedded frontend assets
-- Standalone HTML output that works offline — data, styles, and scripts all inlined
+- Standalone HTML output that works offline — data, styles, and scripts all inlined by default
 - CSV, TSV, and Excel (`.xlsx`) input, gzip archives included
 - Local files, URLs, standard input, or several files combined into one table
 - BOM and UTF-16 detected automatically; `--encoding`, `--delimiter`, `--quotechar` for the rest
@@ -13,6 +13,8 @@ CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 - Five colour themes, switchable in the page or fixed with `--theme`
 - Themes are just CSS variables — define your own with `--css` and it joins the picker
 - `--css` and `--js` inline your own stylesheet and script, with the live table API exposed
+- Self-unpacking output: the frontend ships gzipped, roughly halving every file
+- `--split` into separately cacheable assets instead, or `--serve` a preview over HTTP
 - Mobile-responsive layout
 
 ![CSVtoTable demo](demo/table.gif)
@@ -37,8 +39,14 @@ csvtotable sales.xlsx sales.html
 # Fetch CSV directly from a URL
 csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/demo/meteorite-landings-1.csv meteorites.html
 
-# Open a temporary page in the default browser
+# Build and open the page on a local HTTP server
 csvtotable data.csv --serve
+
+# Serve it on a port you choose
+csvtotable data.csv --serve :8080
+
+# Write a directory of separate files instead of one page
+csvtotable data.csv site/ --split
 
 # Add a title and generate headers for headerless data
 csvtotable data.csv data.html --title "Sales" --no-header
@@ -64,10 +72,11 @@ csvtotable data.csv data.html --css brand.css --js setup.js
 
 # Read stdin and write stdout
 curl -L https://example.com/data.csv | csvtotable - - > data.html
-
-# Explore all the available options
-csvtotable --help
 ```
+
+Run `csvtotable --help` for all options or `csvtotable --version` for the version.
+For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,
+and `--export` still work; the last two disable those features.
 
 ## Install
 
@@ -116,7 +125,63 @@ on your `PATH`.
 Prebuilt binaries support Linux x86-64/ARM64, macOS 12+ x86-64/Apple Silicon,
 and Windows 10+ x86-64.
 
-### Styling
+## Output
+
+### Size
+
+The frontend script is gzipped and base64'd into the page, cutting an otherwise
+empty file from about 260KB to 145KB. Unpacking needs `DecompressionStream`
+(Chrome 103+, Firefox 113+, Safari 16.4+); older browsers get a message saying
+so, and `--no-compress` inlines readable source instead. The stylesheet stays
+uncompressed either way, so the page is styled at first paint.
+
+### Separate files
+
+`--split` writes the output path as a directory instead of a single page:
+
+```
+site/
+  index.html                    the page, a couple of KB
+  csvtotable.9bf9d6348cd4.css   the stylesheet
+  csvtotable.47304c323fd7.js    the frontend
+  data.50248c1cfaed.js          the rows
+```
+
+References are relative, so the directory serves from any path, and the browser
+caches the frontend like any other asset — behind a gzipping server the demo data
+costs roughly 105KB the first time and 31KB on a revisit.
+
+Filenames carry a content hash: an unchanged rerun keeps the URL and the cache
+hit, while changed rows get a new one that cannot be served stale. Superseded
+files are left in place for you to clear out. `index.html` keeps its name, so its
+freshness is up to whatever serves it.
+
+Nothing needs `fetch`, so `index.html` still opens from disk. `--css` and `--js`
+stay inline — a `--css` theme has to be, for the theme picker to find it over
+`file://`. Compression does not apply here; caching does that job.
+
+### Serving
+
+`--serve` builds the page into a temporary directory, serves it over HTTP, and
+opens a browser there. It takes an optional `[HOST]:PORT`:
+
+```sh
+csvtotable data.csv --serve                  # a random loopback port
+csvtotable data.csv --serve :8080            # port 8080 on loopback
+csvtotable data.csv --serve 0.0.0.0:8080     # every interface
+csvtotable data.csv --serve --split          # each asset served separately
+```
+
+An empty host binds loopback; exposing the data on the network takes writing the
+host out, and prints a warning. The address is printed either way, so the page is
+reachable if no browser opens.
+
+Responses carry `Cache-Control: no-store`, since the directory is rebuilt each
+run onto a port the kernel reuses and caching it would mix runs together. The
+directory is removed on exit. A `--split` directory you deploy yourself caches
+normally.
+
+## Styling
 
 The page is plain semantic HTML, and every element CSVtoTable owns carries a
 `csvtotable-` class. These are the stable hooks:
@@ -132,6 +197,7 @@ The page is plain semantic HTML, and every element CSVtoTable owns carries a
 | `.csvtotable-filters` | active-filter chip row |
 | `.csvtotable-chip` | one active filter, with `-key`, `-value`, and `-remove` parts |
 | `.csvtotable-clear` | the "clear all" control |
+| `.csvtotable-error` | shown only when the page cannot unpack itself |
 
 A theme is nothing but a block of colour variables. Every rule in the
 stylesheet reads them, so a new theme is a copy of one block with different
@@ -164,51 +230,44 @@ beginning `dt-` come from DataTables and may change when it is upgraded.
 ### Custom CSS and JavaScript
 
 `--css` and `--js` inline a stylesheet and a script into the page, keeping the
-output a single self-contained file. Both take a file path:
+output self-contained. Both take a file path; a leading `@` is accepted but
+means nothing here:
 
 ```sh
 csvtotable data.csv data.html --css brand.css --js setup.js
 ```
 
-A leading `@` is accepted too, for symmetry with `--description`, but means
-nothing here: `--css @brand.css` and `--css brand.css` are the same.
-
-Placement is what makes them useful. The stylesheet goes last in `<head>`, after
-the built-in one, so a single class selector overrides anything above without
-`!important`. The script goes last in `<body>`, after the table is built, and
-`CsvToTable.table` holds the live [DataTables API](https://datatables.net/reference/api/)
-instance:
+Placement is the point. The stylesheet goes last in `<head>`, so a single class
+selector overrides the built-in one without `!important`. The script goes last
+in `<body>`, after the table is built, with `CsvToTable.table` holding the live
+[DataTables API](https://datatables.net/reference/api/) instance:
 
 ```js
 CsvToTable.table.order([2, "desc"]).draw();   // sort by the third column
 CsvToTable.table.column(0).visible(false);    // hide the first column
 ```
 
-The table's height is fitted on the next animation frame, so a script that
-measures layout should wrap the read in `requestAnimationFrame`. Column widths
-and the scroll height are set as inline styles, which a stylesheet cannot
-override — use `--height` for that.
+The table's height is fitted on the next animation frame, so wrap layout reads
+in `requestAnimationFrame`; column widths and scroll height are inline styles a
+stylesheet cannot override — use `--height`. In a compressed page the script is
+parked in an inert `<script type="text/plain">` and run by the unpacker, so it
+still runs after the table is built.
 
-A whole new palette is a stylesheet plus a matching `--theme`. The name does not
-have to be one of the built-ins as long as `--css` defines it, and the page's
-theme picker will list it alongside them:
+A new palette is a stylesheet plus a matching `--theme`, whose name need not be
+built-in; the picker lists it alongside the others:
 
 ```sh
 csvtotable data.csv data.html --css custom.css --theme tokyonight
 ```
 
-Selecting "Auto" in the picker unpins `data-theme` and falls back to the
-built-in light and dark palettes, so put anything that should survive that in
-`:root` or a class rule and keep `[data-theme]` blocks for the palette itself.
+"Auto" in the picker unpins `data-theme` and falls back to the built-in
+palettes, so keep `[data-theme]` blocks for the palette itself and put anything
+that should survive in `:root`.
 
 Both flags are trusted input: whatever the files contain runs for anyone who
 opens the page, so do not generate them from untrusted data. Content is escaped only
 so it cannot break out of its `<style>` or `<script>` element; it is not
 sanitised.
-
-Run `csvtotable --help` for all options or `csvtotable --version` for the version.
-For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,
-and `--export` still work; the last two disable those features.
 
 ## Development
 

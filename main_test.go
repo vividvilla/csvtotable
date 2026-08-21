@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf16"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func TestConverterCompatibility(t *testing.T) {
@@ -23,11 +25,11 @@ func TestConverterCompatibility(t *testing.T) {
 	if err := os.WriteFile(input, []byte("name,value\nalice,\"</script><script>alert(1)</script>\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cli, err := parseArgs([]string{input, output, "-dl", "25", "-vs", "0", "-eo", "json", "-ps", "-p", "-e", "-h", "50vh", "-c", "<Table>"})
+	cli, err := parseArgs([]string{input, output, "-dl", "25", "-vs", "0", "-eo", "json", "-ps", "-p", "-e", "-h", "50vh", "-c", `\<Table\>`})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cli.DisplayLength != 25 || cli.VirtualScroll != 0 || cli.Height != "50vh" || !cli.PreserveSort || cli.Pagination || cli.ExportEnabled {
+	if cli.PageSize != 25 || cli.VirtualScroll != 0 || cli.Height != "50vh" || !cli.PreserveSort || cli.Pagination || cli.ExportEnabled {
 		t.Fatalf("legacy flags were not preserved: %+v", cli)
 	}
 	if err := run(cli); err != nil {
@@ -40,10 +42,10 @@ func TestConverterCompatibility(t *testing.T) {
 	html := string(page)
 	checks := []string{
 		"<title>&lt;Table&gt;</title>",
-		"<h1 id=\"csvtotable-title\">&lt;Table&gt;</h1>",
+		"<h1 class=\"csvtotable-title\" id=\"csvtotable-title\">&lt;Table&gt;</h1>",
 		`aria-labelledby="csvtotable-title"`,
-		"<button id=\"theme-toggle\"",
-		"CsvToTable.setupTheme(\"#theme-toggle\")",
+		"<button class=\"csvtotable-theme\" id=\"csvtotable-theme\"",
+		"CsvToTable.setupTheme(\"#csvtotable-theme\")",
 		`"headers":["name","value"]`,
 		`"pagination":false`,
 		`"height":"50vh"`,
@@ -60,9 +62,9 @@ func TestConverterCompatibility(t *testing.T) {
 		t.Fatal("generated HTML references external assets or contains unsafe script data")
 	}
 
-	alias, err := parseArgs([]string{input, filepath.Join(directory, "alias.html"), "--title", "Alias"})
-	if err != nil || alias.Caption != "Alias" {
-		t.Fatalf("--title alias failed: %+v, %v", alias, err)
+	alias, err := parseArgs([]string{input, filepath.Join(directory, "alias.html"), "--caption", "Alias"})
+	if err != nil || alias.Title != "Alias" {
+		t.Fatalf("--caption alias failed: %+v, %v", alias, err)
 	}
 	withoutCaption := filepath.Join(directory, "no-caption.html")
 	cli, err = parseArgs([]string{input, withoutCaption})
@@ -73,7 +75,7 @@ func TestConverterCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	page, _ = os.ReadFile(withoutCaption)
-	if strings.Contains(string(page), `<h1 id="csvtotable-title"`) {
+	if strings.Contains(string(page), `<h1 class="csvtotable-title"`) {
 		t.Fatal("empty caption rendered a heading")
 	}
 
@@ -129,7 +131,7 @@ func TestStdioArgumentsAndServeValidation(t *testing.T) {
 		t.Fatalf("no arguments did not show help: %v\n%s", err, help.String())
 	}
 	cli, err := parseArgs([]string{"-", "-", "--caption", "stdin"})
-	if err != nil || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "-" || cli.OutputFile != "-" || cli.Caption != "stdin" {
+	if err != nil || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "-" || cli.OutputFile != "-" || cli.Title != "stdin" {
 		t.Fatalf("stdio arguments were not preserved: %+v, %v", cli, err)
 	}
 	cli, err = parseArgs([]string{"--delimiter", "-", "input.csv", "output.html"})
@@ -428,5 +430,128 @@ func TestToolbarAndColumnFilterOptions(t *testing.T) {
 	}
 	if parsed.ColumnFilters {
 		t.Error("--no-column-filters did not disable column filters")
+	}
+}
+
+func TestTitleAndDescriptionRendering(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	notes := filepath.Join(directory, "notes.md")
+	if err := os.WriteFile(notes, []byte("Pulled from the **warehouse**.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	markdown := base
+	markdown.Title = "Sales *for* `Q3`"
+	markdown.Description = "@" + notes
+	var rendered bytes.Buffer
+	if err := convert(markdown, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<h1 class="csvtotable-title" id="csvtotable-title">Sales <em>for</em> <code>Q3</code></h1>`,
+		`<div class="csvtotable-description"><p>Pulled from the <strong>warehouse</strong>.</p></div>`,
+		"<title>Sales for Q3</title>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("rendered page is missing %s", want)
+		}
+	}
+
+	raw := base
+	raw.TitleHTML = `<span>Ops <b>Dash</b></span>`
+	raw.DescriptionHTML = `<p>Raw <a href="#">link</a></p>`
+	rendered.Reset()
+	if err := convert(raw, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page = rendered.String()
+	for _, want := range []string{
+		`<h1 class="csvtotable-title" id="csvtotable-title"><span>Ops <b>Dash</b></span></h1>`,
+		`<div class="csvtotable-description"><p>Raw <a href="#">link</a></p></div>`,
+		"<title>Ops Dash</title>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("raw HTML page is missing %s", want)
+		}
+	}
+
+	unsafe := base
+	unsafe.Title = "Hi <script>alert(1)</script>"
+	rendered.Reset()
+	if err := convert(unsafe, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), "<script>alert(1)") {
+		t.Error("Markdown mode passed raw HTML through")
+	}
+
+	missing := base
+	missing.Description = "@" + filepath.Join(directory, "absent.md")
+	if err := convert(missing, io.Discard); err == nil || !strings.Contains(err.Error(), "description") {
+		t.Fatalf("missing description file was accepted: %v", err)
+	}
+
+	if _, err := parseArgs([]string{"--title", "a", "--title-html", "b", input, "out.html"}); err == nil {
+		t.Error("--title and --title-html were accepted together")
+	}
+	if _, err := parseArgs([]string{"--description", "a", "--description-html", "b", input, "out.html"}); err == nil {
+		t.Error("--description and --description-html were accepted together")
+	}
+	sized, err := parseArgs([]string{"--page-size", "25", input, "out.html"})
+	if err != nil || sized.PageSize != 25 {
+		t.Fatalf("--page-size failed: %+v, %v", sized, err)
+	}
+}
+
+func TestWorkbookInput(t *testing.T) {
+	directory := t.TempDir()
+	workbook := excelize.NewFile()
+	defer workbook.Close()
+	sheet := workbook.GetSheetName(0)
+	for index, row := range [][]any{
+		{"city", "temperature", "note"},
+		{"Pune", 29, "warm"},
+		{"Mumbai", 31},
+	} {
+		cell, err := excelize.CoordinatesToCellName(1, index+1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workbook.SetSheetRow(sheet, cell, &row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(directory, "input.xlsx")
+	if err := workbook.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+
+	var rendered bytes.Buffer
+	if err := convert(options{InputFiles: []string{path}, Delimiter: ",", Quote: "\""}, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`"headers":["city","temperature","note"]`,
+		`["Pune","29","warm"]`,
+		`["Mumbai","31",""]`, // trailing empty cells are dropped by the format
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("workbook output is missing %s", want)
+		}
+	}
+
+	notWorkbook := filepath.Join(directory, "fake.xlsx")
+	if err := os.WriteFile(notWorkbook, []byte("PK\x03\x04not a workbook"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(options{InputFiles: []string{notWorkbook}, Delimiter: ",", Quote: "\""}, io.Discard); err == nil {
+		t.Error("a corrupt workbook was accepted")
 	}
 }

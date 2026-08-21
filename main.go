@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	_ "embed"
@@ -16,6 +17,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -23,6 +25,8 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+	"github.com/xuri/excelize/v2"
+	"github.com/yuin/goldmark"
 	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -39,27 +43,30 @@ var version = "dev"
 const stdioArgument = "\x00"
 
 type options struct {
-	InputFiles    []string
-	OutputFile    string
-	Caption       string
-	Delimiter     string
-	Quote         string
-	DisplayLength int
-	Overwrite     bool
-	Serve         bool
-	Height        string
-	Pagination    bool
-	VirtualScroll int64
-	NoHeader      bool
-	ExportEnabled bool
-	ExportOptions []string
-	PreserveSort  bool
-	Encoding      string
-	ColumnFilters bool
+	InputFiles      []string
+	OutputFile      string
+	Title           string
+	TitleHTML       string
+	Description     string
+	DescriptionHTML string
+	Delimiter       string
+	Quote           string
+	PageSize        int
+	Overwrite       bool
+	Serve           bool
+	Height          string
+	Pagination      bool
+	VirtualScroll   int64
+	NoHeader        bool
+	ExportEnabled   bool
+	ExportOptions   []string
+	PreserveSort    bool
+	Encoding        string
+	ColumnFilters   bool
 }
 
 type tableOptions struct {
-	DisplayLength int      `json:"displayLength"`
+	PageSize      int      `json:"displayLength"`
 	Height        string   `json:"height"`
 	Pagination    bool     `json:"pagination"`
 	VirtualScroll int64    `json:"virtualScroll"`
@@ -157,10 +164,13 @@ func newCommand(action func(options) error) *cli.Command {
 		Version:                   buildVersion(),
 		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "caption", Aliases: []string{"c", "title"}, Usage: "Table caption and HTML title", Destination: &parsed.Caption},
+			&cli.StringFlag{Name: "title", Aliases: []string{"caption", "c"}, Usage: "Page heading, as Markdown", Destination: &parsed.Title},
+			&cli.StringFlag{Name: "title-html", Aliases: []string{"th"}, Usage: "Page heading, as raw HTML", Destination: &parsed.TitleHTML},
+			&cli.StringFlag{Name: "description", Aliases: []string{"desc"}, Usage: "Text below the heading, as Markdown; @FILE reads a file", Destination: &parsed.Description},
+			&cli.StringFlag{Name: "description-html", Aliases: []string{"dh"}, Usage: "Text below the heading, as raw HTML; @FILE reads a file", Destination: &parsed.DescriptionHTML},
 			&cli.StringFlag{Name: "delimiter", Aliases: []string{"d"}, Value: ",", Usage: "CSV delimiter", Destination: &parsed.Delimiter},
 			&cli.StringFlag{Name: "quotechar", Aliases: []string{"q"}, Value: "\"", Usage: "CSV quote character", Destination: &parsed.Quote},
-			&cli.IntFlag{Name: "display-length", Aliases: []string{"dl"}, Value: -1, Usage: "Rows per page; -1 shows all rows", Destination: &parsed.DisplayLength},
+			&cli.IntFlag{Name: "page-size", Aliases: []string{"display-length", "dl"}, Value: -1, Usage: "Rows per page; -1 shows all rows", Destination: &parsed.PageSize},
 			&cli.BoolFlag{Name: "overwrite", Aliases: []string{"o"}, Usage: "Overwrite an existing output file", Destination: &parsed.Overwrite},
 			&cli.BoolFlag{Name: "serve", Aliases: []string{"s"}, Usage: "Open a temporary result in the default browser", Destination: &parsed.Serve},
 			&cli.StringFlag{Name: "height", Aliases: []string{"h"}, Usage: "Table height in px or viewport %", Destination: &parsed.Height},
@@ -177,6 +187,12 @@ func newCommand(action func(options) error) *cli.Command {
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
+			if parsed.Title != "" && parsed.TitleHTML != "" {
+				return errors.New("use either --title or --title-html, not both")
+			}
+			if parsed.Description != "" && parsed.DescriptionHTML != "" {
+				return errors.New("use either --description or --description-html, not both")
+			}
 			for _, option := range parsed.ExportOptions {
 				if !slices.Contains([]string{"copy", "csv", "json", "print", "colvis"}, option) {
 					return fmt.Errorf("invalid export option %q", option)
@@ -385,19 +401,29 @@ func convert(cli options, destination io.Writer) error {
 		return errors.New("missing argument \"input_file\"")
 	}
 
-	caption := cli.Caption
-	if strings.TrimSpace(caption) == "" {
-		caption = ""
+	heading, err := headingMarkup(cli)
+	if err != nil {
+		return err
 	}
-	title := caption
+	description, err := descriptionMarkup(cli)
+	if err != nil {
+		return err
+	}
+	title := plainText(heading)
 	if title == "" {
 		title = "Table"
 	}
-	headingHTML := ""
+	headerHTML := ""
 	tableLabel := ` aria-label="Table"`
-	if caption != "" {
-		headingHTML = "<h1 id=\"csvtotable-title\">" + html.EscapeString(caption) + "</h1>\n"
+	if heading != "" {
+		headerHTML = "<h1 class=\"csvtotable-title\" id=\"csvtotable-title\">" + heading + "</h1>\n"
 		tableLabel = ` aria-labelledby="csvtotable-title"`
+	}
+	if description != "" {
+		headerHTML += "<div class=\"csvtotable-description\">" + description + "</div>\n"
+	}
+	if headerHTML != "" {
+		headerHTML = "<header class=\"csvtotable-header\">\n" + headerHTML + "</header>\n"
 	}
 	height := cli.Height
 	if height == "" {
@@ -407,7 +433,7 @@ func convert(cli options, destination io.Writer) error {
 		height = value + "vh"
 	}
 	settings := tableOptions{
-		DisplayLength: cli.DisplayLength,
+		PageSize:      cli.PageSize,
 		Height:        height,
 		Pagination:    cli.Pagination,
 		VirtualScroll: cli.VirtualScroll,
@@ -431,7 +457,7 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main>\n%s<button id=\"theme-toggle\" class=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\"></button>\n<table id=\"table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headingHTML, tableLabel, headersJSON)
+		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n<main class=\"csvtotable\">\n%s<button class=\"csvtotable-theme\" id=\"csvtotable-theme\" type=\"button\" aria-label=\"Use dark theme\" title=\"Use dark theme\"></button>\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", html.EscapeString(title), strings.ReplaceAll(tableCSS, "</style", "<\\/style"), headerHTML, tableLabel, headersJSON)
 		started = err == nil
 		return err
 	}
@@ -457,12 +483,11 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("input %q: %w", source, err)
 		}
-		decoded, err := decodeInput(input, cli.Encoding)
+		reader, err := newRowReader(input, cli.Encoding, delimiter, quote)
 		if err != nil {
 			input.Close()
 			return fmt.Errorf("input %q: %w", source, err)
 		}
-		reader := newCSVReader(decoded, delimiter, quote)
 		rowNumber := 0
 		readErr := func() error {
 			for {
@@ -499,6 +524,9 @@ func convert(cli options, destination io.Writer) error {
 				if strict && len(record) != expectedColumns {
 					return fmt.Errorf("row %d has %d columns; expected %d", rowNumber, len(record), expectedColumns)
 				}
+				for len(record) < expectedColumns {
+					record = append(record, "")
+				}
 				if err := writeRow(record); err != nil {
 					return err
 				}
@@ -508,6 +536,9 @@ func convert(cli options, destination io.Writer) error {
 			}
 			return nil
 		}()
+		if closer, ok := reader.(io.Closer); ok {
+			closer.Close()
+		}
 		closeErr := input.Close()
 		if readErr != nil {
 			return fmt.Errorf("input %q: %w", source, readErr)
@@ -522,7 +553,7 @@ func convert(cli options, destination io.Writer) error {
 		}
 	}
 
-	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n<script>%s</script>\n<script>CsvToTable.setupTheme(\"#theme-toggle\");CsvToTable.createCsvTable(\"#table\",JSON.parse(document.getElementById(\"csvtotable-data\").textContent),JSON.parse(document.getElementById(\"csvtotable-options\").textContent));</script>\n</body>\n</html>\n", optionsJSON, strings.ReplaceAll(tableJS, "</script", "<\\/script")); err != nil {
+	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n<script>%s</script>\n<script>CsvToTable.setupTheme(\"#csvtotable-theme\");CsvToTable.createCsvTable(\"#csvtotable-table\",JSON.parse(document.getElementById(\"csvtotable-data\").textContent),JSON.parse(document.getElementById(\"csvtotable-options\").textContent));</script>\n</body>\n</html>\n", optionsJSON, strings.ReplaceAll(tableJS, "</script", "<\\/script")); err != nil {
 		return err
 	}
 	return output.Flush()
@@ -547,6 +578,81 @@ func decompress(input io.ReadCloser) (io.ReadCloser, error) {
 type readCloser struct {
 	io.Reader
 	io.Closer
+}
+
+// readText expands curl-style @FILE references in flag values.
+func readText(value string) (string, error) {
+	path, found := strings.CutPrefix(value, "@")
+	if !found {
+		return value, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
+// renderMarkdown converts Markdown to HTML. Goldmark drops raw HTML unless it is
+// told otherwise, which is what keeps --title separate from --title-html.
+func renderMarkdown(source string) (string, error) {
+	var rendered bytes.Buffer
+	if err := goldmark.Convert([]byte(source), &rendered); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(rendered.String()), nil
+}
+
+// renderInlineMarkdown drops the paragraph wrapper so the result can live inside
+// a heading.
+func renderInlineMarkdown(source string) (string, error) {
+	rendered, err := renderMarkdown(source)
+	if err != nil {
+		return "", err
+	}
+	inner, trimmed := strings.CutPrefix(rendered, "<p>")
+	if inner, ok := strings.CutSuffix(inner, "</p>"); trimmed && ok && !strings.Contains(inner, "<p>") {
+		return inner, nil
+	}
+	return rendered, nil
+}
+
+var markupTag = regexp.MustCompile(`<[^>]*>`)
+
+// plainText reduces generated markup to the text used for the document title.
+func plainText(markup string) string {
+	return strings.TrimSpace(html.UnescapeString(markupTag.ReplaceAllString(markup, "")))
+}
+
+func headingMarkup(cli options) (string, error) {
+	if cli.TitleHTML != "" {
+		return strings.TrimSpace(cli.TitleHTML), nil
+	}
+	if strings.TrimSpace(cli.Title) == "" {
+		return "", nil
+	}
+	return renderInlineMarkdown(cli.Title)
+}
+
+func descriptionMarkup(cli options) (string, error) {
+	if cli.DescriptionHTML != "" {
+		content, err := readText(cli.DescriptionHTML)
+		if err != nil {
+			return "", fmt.Errorf("description-html: %w", err)
+		}
+		return strings.TrimSpace(content), nil
+	}
+	if cli.Description == "" {
+		return "", nil
+	}
+	content, err := readText(cli.Description)
+	if err != nil {
+		return "", fmt.Errorf("description: %w", err)
+	}
+	if strings.TrimSpace(content) == "" {
+		return "", nil
+	}
+	return renderMarkdown(content)
 }
 
 func openInput(source string) (io.ReadCloser, error) {
@@ -599,6 +705,64 @@ func decodeInput(input io.Reader, label string) (io.Reader, error) {
 		return nil, fmt.Errorf("unknown encoding: %s", label)
 	}
 	return transform.NewReader(input, transform.Chain(encoding.NewDecoder(), unicode.UTF8BOM.NewDecoder())), nil
+}
+
+// rowReader is the shape shared by the CSV and worksheet readers.
+type rowReader interface {
+	Read() ([]string, error)
+}
+
+// newRowReader picks a reader from the content itself: a zip signature means an
+// Excel workbook, anything else is text to be decoded and parsed as CSV.
+func newRowReader(input io.Reader, encoding string, delimiter, quote rune) (rowReader, error) {
+	buffered := bufio.NewReader(input)
+	if magic, _ := buffered.Peek(4); string(magic) == "PK\x03\x04" {
+		return newSheetReader(buffered)
+	}
+	decoded, err := decodeInput(buffered, encoding)
+	if err != nil {
+		return nil, err
+	}
+	return newCSVReader(decoded, delimiter, quote), nil
+}
+
+// sheetReader streams the first worksheet of a workbook.
+type sheetReader struct {
+	workbook *excelize.File
+	rows     *excelize.Rows
+}
+
+func newSheetReader(input io.Reader) (*sheetReader, error) {
+	workbook, err := excelize.OpenReader(input)
+	if err != nil {
+		return nil, err
+	}
+	sheets := workbook.GetSheetList()
+	if len(sheets) == 0 {
+		workbook.Close()
+		return nil, errors.New("workbook has no sheets")
+	}
+	rows, err := workbook.Rows(sheets[0])
+	if err != nil {
+		workbook.Close()
+		return nil, err
+	}
+	return &sheetReader{workbook: workbook, rows: rows}, nil
+}
+
+func (reader *sheetReader) Read() ([]string, error) {
+	if !reader.rows.Next() {
+		if err := reader.rows.Error(); err != nil {
+			return nil, err
+		}
+		return nil, io.EOF
+	}
+	return reader.rows.Columns()
+}
+
+func (reader *sheetReader) Close() error {
+	reader.rows.Close()
+	return reader.workbook.Close()
 }
 
 type csvReader struct {

@@ -11,6 +11,16 @@
   --ct-accent: #004da8;
   --ct-wash: #eaf1fc;
   --ct-hover: #f4f6f8;
+  --ct-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ct-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ct-text-2xs: .6875rem;
+  --ct-text-xs: .75rem;
+  --ct-text-sm: .8125rem;
+  --ct-text-base: .875rem;
+  --ct-text-md: 1rem;
+  --ct-text-lg: 1.125rem;
+  --ct-text-xl: 1.375rem;
+  --ct-text-2xl: 1.75rem;
   --ct-search-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2361666e' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>");
 }
 
@@ -58,7 +68,7 @@ html, body { margin: 0; }
 body {
   background: var(--ct-paper);
   color: var(--ct-ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--ct-sans);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
@@ -70,16 +80,50 @@ main { padding: 1.6rem 1.5rem 1rem; }
   outline-offset: 2px;
 }
 
-#csvtotable-title {
-  font-size: 1.3rem;
+h1, h2, h3, h4, h5, h6 {
+  color: var(--ct-ink);
   font-weight: 600;
   letter-spacing: -.015em;
-  margin: 0 0 1.1rem;
+  line-height: 1.3;
+  margin: 1rem 0 .5rem;
 }
+:is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+h1 { font-size: var(--ct-text-2xl); }
+h2 { font-size: var(--ct-text-xl); }
+h3 { font-size: var(--ct-text-lg); }
+h4, h5, h6 { font-size: var(--ct-text-md); }
+
+code {
+  background: var(--ct-hover);
+  border-radius: 4px;
+  font-family: var(--ct-mono);
+  font-size: .875em;
+  padding: .1em .3em;
+}
+
+.csvtotable-header { margin: 0 0 1.1rem; }
+.csvtotable-title { margin: 0 0 .6rem; }
+.csvtotable-title:last-child { margin-bottom: 0; }
+
+.csvtotable-description {
+  color: var(--ct-muted);
+  font-size: var(--ct-text-base);
+  line-height: 1.55;
+  margin: 0;
+  max-width: min(100ch, 100%);
+}
+.csvtotable-description > :first-child { margin-top: 0; }
+.csvtotable-description > :last-child { margin-bottom: 0; }
+.csvtotable-description p,
+.csvtotable-description ul,
+.csvtotable-description ol { margin: 0 0 .5rem; }
+.csvtotable-description ul,
+.csvtotable-description ol { padding-left: 1.1rem; }
+.csvtotable-description a { color: var(--ct-accent); }
 
 /* Toolbar ------------------------------------------------------------- */
 
-div.dt-container { color: var(--ct-ink); font-size: .875rem; }
+div.dt-container { color: var(--ct-ink); font-size: var(--ct-text-base); }
 
 div.dt-container div.dt-layout-row { margin: 0 0 .85rem; }
 div.dt-container div.dt-layout-row.dt-layout-table { margin: 0; }
@@ -95,7 +139,7 @@ div.dt-container div.dt-search input {
   border-radius: 7px;
   color: inherit;
   font: inherit;
-  font-size: .875rem;
+  font-size: var(--ct-text-base);
   margin: 0;
   padding: .5rem .7rem .5rem 2.05rem;
   width: 19rem;
@@ -109,8 +153,8 @@ div.dt-container div.dt-search input:focus {
 
 div.dt-container div.dt-info {
   color: var(--ct-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: .75rem;
+  font-family: var(--ct-mono);
+  font-size: var(--ct-text-xs);
   padding: 0;
   white-space: nowrap;
 }
@@ -125,7 +169,7 @@ div.dt-container div.dt-buttons > button.dt-button,
   color: var(--ct-muted);
   cursor: pointer;
   font: inherit;
-  font-size: .8125rem;
+  font-size: var(--ct-text-sm);
   font-weight: 500;
   letter-spacing: 0;
   margin: 0;
@@ -141,7 +185,6 @@ div.dt-container div.dt-buttons > button.dt-button.dt-button-active,
 }
 .csvtotable-theme {
   display: grid;
-  font-size: .9rem;
   height: 2.05rem;
   padding: 0;
   place-items: center;
@@ -165,7 +208,7 @@ div.dt-button-collection {
 div.dt-button-collection button.dt-button {
   border-radius: 5px;
   color: var(--ct-ink);
-  font-size: .8125rem;
+  font-size: var(--ct-text-sm);
   padding: .4rem .6rem;
   text-align: left;
 }
@@ -191,14 +234,14 @@ div.dt-button-collection button.dt-button:hover { background: var(--ct-hover); }
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-size: .75rem;
+  font-size: var(--ct-text-xs);
   gap: .4rem;
   padding: .28rem .5rem .28rem .6rem;
 }
 .csvtotable-chip:hover { border-color: var(--ct-accent); }
 .csvtotable-chip-key {
   color: var(--ct-muted);
-  font-size: .6875rem;
+  font-size: var(--ct-text-2xs);
   font-weight: 600;
   letter-spacing: .07em;
   text-transform: uppercase;
@@ -210,7 +253,7 @@ div.dt-button-collection button.dt-button:hover { background: var(--ct-hover); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.csvtotable-chip-remove { font-size: .9rem; line-height: 1; opacity: .55; }
+.csvtotable-chip-remove { font-size: var(--ct-text-base); line-height: 1; opacity: .55; }
 .csvtotable-chip:hover .csvtotable-chip-remove { opacity: 1; }
 
 .csvtotable-clear {
@@ -220,7 +263,7 @@ div.dt-button-collection button.dt-button:hover { background: var(--ct-hover); }
   color: var(--ct-muted);
   cursor: pointer;
   font: inherit;
-  font-size: .75rem;
+  font-size: var(--ct-text-xs);
   margin-left: .25rem;
   padding: .28rem .2rem;
   text-decoration: underline;
@@ -247,7 +290,7 @@ table.dataTable > thead > tr > th,
 table.dataTable > thead > tr > td {
   border-bottom: 1px solid var(--ct-rule-strong);
   color: var(--ct-muted);
-  font-size: .6875rem;
+  font-size: var(--ct-text-2xs);
   font-weight: 600;
   letter-spacing: .07em;
   padding: .5rem .75rem;
@@ -272,7 +315,7 @@ table.dataTable > tbody > tr { background: transparent; }
 table.dataTable > tbody > tr > td {
   border-bottom: 1px solid var(--ct-rule);
   color: var(--ct-ink);
-  font-size: .8125rem;
+  font-size: var(--ct-text-sm);
   padding: .48rem .75rem;
 }
 table.dataTable > tbody > tr:hover > td { background: var(--ct-hover); }
@@ -308,7 +351,7 @@ div.dt-container table.dataTable tfoot select {
   border-radius: 5px;
   color: inherit;
   font: inherit;
-  font-size: .75rem;
+  font-size: var(--ct-text-xs);
   max-width: 20rem;
   min-width: 0;
   padding: .28rem .35rem;
@@ -332,7 +375,7 @@ div.dt-container div.dt-length select {
   border-radius: 6px;
   color: inherit;
   font: inherit;
-  font-size: .8125rem;
+  font-size: var(--ct-text-sm);
   padding: .3rem .4rem;
 }
 div.dt-container div.dt-paging button.dt-paging-button {
@@ -340,7 +383,7 @@ div.dt-container div.dt-paging button.dt-paging-button {
   border: 0;
   border-radius: 6px;
   color: var(--ct-muted);
-  font-size: .8125rem;
+  font-size: var(--ct-text-sm);
   min-width: 2rem;
   padding: .35rem .5rem;
 }
@@ -360,7 +403,7 @@ div.dt-container div.dt-paging button.dt-paging-button.disabled { opacity: .35; 
 
 @media (max-width: 767px) {
   main { padding: 1rem .8rem; }
-  div.dt-container { font-size: .8125rem; }
+  div.dt-container { font-size: var(--ct-text-sm); }
   div.dt-container div.dt-layout-row:not(.dt-layout-table) {
     align-items: stretch;
     display: flex;

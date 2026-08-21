@@ -34,6 +34,8 @@ const themeKey = "csvtotable-theme";
 const filterChoiceLimit = 25;
 // Stands in for the search box in the active-filter list, which is keyed by column.
 const globalSearch = -1;
+// Least of the viewport the table keeps when the heading and description are tall.
+const minimumViewportShare = 0.6;
 
 buttons.json = {
   text: "JSON",
@@ -202,7 +204,7 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
   if (chosen.length !== exports.length) toolbar.push({ extend: "colvis", text: "Columns" });
 
   const element = document.querySelector<HTMLTableElement>(selector);
-  const themeToggle = document.querySelector("#theme-toggle");
+  const themeToggle = document.querySelector(".csvtotable-theme");
   const summary = document.createElement("div");
   summary.className = "csvtotable-filters";
   summary.hidden = true;
@@ -257,13 +259,15 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
         if (!scrollBody) return;
         const parent = container.closest("main") ?? document.body;
         const bottomMargin = parseFloat(getComputedStyle(parent).paddingBottom) || 0;
-        const height = Math.max(
-          120,
-          scrollBody.getBoundingClientRect().height +
-            window.innerHeight -
-            container.getBoundingClientRect().bottom -
-            bottomMargin,
-        );
+        const bodyRect = scrollBody.getBoundingClientRect();
+        // Measured against the document, not the viewport, so a scrolled page
+        // (which a long description causes) does not inflate the result.
+        const trailing = container.getBoundingClientRect().bottom - bodyRect.bottom;
+        const available =
+          window.innerHeight - (bodyRect.top + window.scrollY) - trailing - bottomMargin;
+        // A tall heading must not squeeze the table into a sliver; past this
+        // point the page scrolls instead.
+        const height = Math.max(120, window.innerHeight * minimumViewportShare, available);
         scrollBody.style.height = `${Math.floor(height)}px`;
         scrollBody.style.maxHeight = scrollBody.style.height;
         table.columns.adjust();

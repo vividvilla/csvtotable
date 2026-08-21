@@ -1,17 +1,19 @@
 # CSVtoTable
 
-CSVtoTable converts CSV and Excel files into interactive HTML tables.
+CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 
 - Single native binary with embedded frontend assets
-- Standalone HTML output that works offline
-- CSV and Excel (`.xlsx`) input
-- Local files, URLs, standard input, gzip archives, and multi-file input
-- Mobile-responsive table layout
-- Search, per-column filters with active-filter chips, sorting, and virtual scrolling
+- Standalone HTML output that works offline — data, styles, and scripts all inlined
+- CSV, TSV, and Excel (`.xlsx`) input, gzip archives included
+- Local files, URLs, standard input, or several files combined into one table
+- BOM and UTF-16 detected automatically; `--encoding`, `--delimiter`, `--quotechar` for the rest
+- Search, per-column filters with clearable chips, sorting, pagination, and virtual scrolling
 - Copy, CSV, JSON, and print exports, plus column show/hide
-- Markdown or raw HTML in the page title and description
-- Five colour themes, pickable in the page or fixed with `--theme`
-- Custom CSS and JavaScript inlined into the page with `--css` and `--js`
+- Markdown or raw HTML page title and description, inline or read from a file
+- Five colour themes, switchable in the page or fixed with `--theme`
+- Themes are just CSS variables — define your own with `--css` and it joins the picker
+- `--css` and `--js` inline your own stylesheet and script, with the live table API exposed
+- Mobile-responsive layout
 
 ![CSVtoTable demo](demo/table.gif)
 

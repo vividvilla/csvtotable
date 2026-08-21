@@ -3,7 +3,7 @@
 CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 
 - Single native binary with embedded frontend assets
-- Standalone HTML output that works offline — data, styles, and scripts all inlined
+- Standalone HTML output that works offline — data, styles, and scripts all inlined by default
 - CSV, TSV, and Excel (`.xlsx`) input, gzip archives included
 - Local files, URLs, standard input, or several files combined into one table
 - BOM and UTF-16 detected automatically; `--encoding`, `--delimiter`, `--quotechar` for the rest
@@ -14,6 +14,7 @@ CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 - Themes are just CSS variables — define your own with `--css` and it joins the picker
 - `--css` and `--js` inline your own stylesheet and script, with the live table API exposed
 - Self-unpacking output: the frontend ships gzipped, roughly halving every file
+- `--split` into separately cacheable assets instead, or `--serve` a preview over HTTP
 - Mobile-responsive layout
 
 ![CSVtoTable demo](demo/table.gif)
@@ -38,8 +39,14 @@ csvtotable sales.xlsx sales.html
 # Fetch CSV directly from a URL
 csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/demo/meteorite-landings-1.csv meteorites.html
 
-# Open a temporary page in the default browser
+# Build and open the page on a local HTTP server
 csvtotable data.csv --serve
+
+# Serve it on a port you choose
+csvtotable data.csv --serve :8080
+
+# Write a directory of separate files instead of one page
+csvtotable data.csv site/ --split
 
 # Add a title and generate headers for headerless data
 csvtotable data.csv data.html --title "Sales" --no-header
@@ -65,10 +72,11 @@ csvtotable data.csv data.html --css brand.css --js setup.js
 
 # Read stdin and write stdout
 curl -L https://example.com/data.csv | csvtotable - - > data.html
-
-# Explore all the available options
-csvtotable --help
 ```
+
+Run `csvtotable --help` for all options or `csvtotable --version` for the version.
+For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,
+and `--export` still work; the last two disable those features.
 
 ## Install
 
@@ -117,7 +125,83 @@ on your `PATH`.
 Prebuilt binaries support Linux x86-64/ARM64, macOS 12+ x86-64/Apple Silicon,
 and Windows 10+ x86-64.
 
-### Styling
+## Output
+
+### Size
+
+The frontend script is gzipped and base64'd into the page, which cuts an
+otherwise empty file from about 260KB to 145KB. Unpacking it needs
+`DecompressionStream` (Chrome 103+, Firefox 113+, Safari 16.4+); older browsers
+get a message saying so. `--no-compress` inlines the script as readable source
+instead, for those browsers or for grepping the output.
+
+The stylesheet is left uncompressed either way, so the page is styled at first
+paint rather than after the script has unpacked.
+
+### Separate files
+
+`--split` writes the output path as a directory instead of a single page:
+
+```
+site/
+  index.html                    the page, a couple of KB
+  csvtotable.9bf9d6348cd4.css   the stylesheet
+  csvtotable.47304c323fd7.js    the frontend
+  data.50248c1cfaed.js          the rows
+```
+
+The references are relative, so the directory can be served from any path. The
+browser then caches the stylesheet and the script the way it caches any other
+asset, and a second page — or a reload — costs only the data. Behind a server
+that gzips, the demo data goes over the wire as roughly 105KB the first time and
+31KB on a revisit.
+
+Everything the page links to carries a hash of its contents. Regenerating with
+the same rows and the same binary leaves the names alone, so the cache keeps
+hitting; change either and the URL changes, so a browser or CDN holding the old
+copy cannot serve it against the new page. Superseded files are left in place
+rather than deleted, since they may still be wanted by a page someone has open —
+clearing them out is yours to do. `index.html` keeps its name, so its freshness
+is up to whatever serves it, as with any static site.
+
+Nothing here needs `fetch`, so `index.html` still renders when opened straight
+from disk. `--css` and `--js` stay inline in the page rather than becoming files
+of their own: they are usually small, and a `--css` theme has to be inline for
+the theme picker to find it over `file://`, where reading rules out of a linked
+stylesheet is blocked.
+
+Compression does not apply in this mode — caching is doing the job that
+compressing the bundle stood in for.
+
+### Serving
+
+`--serve` builds the page into a temporary directory, serves it over HTTP, and
+opens a browser there. It takes an optional `[HOST]:PORT`:
+
+```sh
+csvtotable data.csv --serve                  # a random loopback port
+csvtotable data.csv --serve :8080            # port 8080 on loopback
+csvtotable data.csv --serve 0.0.0.0:8080     # every interface
+```
+
+Leaving the host off binds loopback, so putting the data on the network takes
+writing the host out in full, and doing that prints a warning. The address is
+printed either way, so the page is still reachable if no browser opens.
+
+Combined with `--split` it serves each asset separately, which is the same
+thing a deployment would do:
+
+```sh
+csvtotable data.csv --serve --split
+```
+
+The temporary directory is removed on Ctrl-C. Responses carry
+`Cache-Control: no-store`: the directory is rebuilt on every run and the port is
+reused, so a cached asset from an earlier run would otherwise be mixed into a
+later page. That applies to the preview only — a `--split` directory you deploy
+yourself caches normally, which is the point of the mode.
+
+## Styling
 
 The page is plain semantic HTML, and every element CSVtoTable owns carries a
 `csvtotable-` class. These are the stable hooks:
@@ -188,8 +272,10 @@ CsvToTable.table.column(0).visible(false);    // hide the first column
 
 In a compressed page the script is parked in an inert `<script
 type="text/plain">` and run by the unpacker, so it still runs after the table is
-built. The table's height is fitted on the next animation frame, so a script
-that measures layout should wrap the read in `requestAnimationFrame`. Column widths
+built.
+
+The table's height is fitted on the next animation frame, so a script that
+measures layout should wrap the read in `requestAnimationFrame`. Column widths
 and the scroll height are set as inline styles, which a stylesheet cannot
 override — use `--height` for that.
 
@@ -209,21 +295,6 @@ Both flags are trusted input: whatever the files contain runs for anyone who
 opens the page, so do not generate them from untrusted data. Content is escaped only
 so it cannot break out of its `<style>` or `<script>` element; it is not
 sanitised.
-
-### Output size
-
-The frontend script is gzipped and base64'd into the page, which cuts an
-otherwise empty file from about 260KB to 145KB. Unpacking it needs
-`DecompressionStream` (Chrome 103+, Firefox 113+, Safari 16.4+); older browsers
-get a message saying so. `--no-compress` inlines the script as readable source
-instead, for those browsers or for grepping the output.
-
-The stylesheet is left uncompressed either way, so the page is styled at first
-paint rather than after the script has unpacked.
-
-Run `csvtotable --help` for all options or `csvtotable --version` for the version.
-For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,
-and `--export` still work; the last two disable those features.
 
 ## Development
 

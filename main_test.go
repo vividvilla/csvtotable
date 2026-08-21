@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,8 +13,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf16"
 
 	"github.com/xuri/excelize/v2"
@@ -908,5 +911,221 @@ func TestBundleCompression(t *testing.T) {
 	}
 	if string(unpacked) != tableJS {
 		t.Error("the unpacked bundle differs from the embedded one")
+	}
+}
+
+func TestSplitOutput(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\nKochi,31\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(directory, "site")
+	cli, err := parseArgs([]string{input, target, "--split", "--title", "Weather"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := run(cli); err != nil {
+		t.Fatal(err)
+	}
+
+	read := func(name string) string {
+		content, err := os.ReadFile(filepath.Join(target, name))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		return string(content)
+	}
+	jsName := hashedName("csvtotable", ".js", tableJS)
+	cssName := hashedName("csvtotable", ".css", tableCSS)
+	if read(jsName) != tableJS || read(cssName) != tableCSS {
+		t.Error("the written assets differ from the embedded ones")
+	}
+
+	// The page must reference its assets by relative path, so that it works
+	// from a subdirectory of whatever ends up serving it, and every reference
+	// must carry a content hash so a redeploy cannot be served stale.
+	page := read(indexFile)
+	for _, want := range []string{
+		`<link rel="stylesheet" href="` + cssName + `">`,
+		`<script src="` + jsName + `"></script>`,
+		"window.csvtotableData",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("index.html is missing %q", want)
+		}
+	}
+	dataRef := regexp.MustCompile(`<script src="(data\.[0-9a-f]{12}\.js)"></script>`).FindStringSubmatch(page)
+	if dataRef == nil {
+		t.Fatalf("index.html has no hashed data reference:\n%s", page)
+	}
+	dataName := dataRef[1]
+	// Nothing that belongs in a separate file may also be inlined, or the
+	// caching the mode exists for is wasted.
+	for _, unwanted := range []string{"DataTables 3.0.2", "--ct-accent", "csvtotable-bundle", `"rows":[`} {
+		if strings.Contains(page, unwanted) {
+			t.Errorf("index.html still inlines %q", unwanted)
+		}
+	}
+	if len(page) > 4096 {
+		t.Errorf("index.html is %d bytes; it should hold no payload", len(page))
+	}
+
+	// The rows have to survive the trip into a separate script.
+	data := read(dataName)
+	encoded, ok := strings.CutPrefix(strings.TrimSpace(data), "window.csvtotableData=")
+	if !ok {
+		t.Fatalf("data.js does not assign the payload: %.60q", data)
+	}
+	var payload struct {
+		Headers []string   `json:"headers"`
+		Rows    [][]string `json:"rows"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSuffix(encoded, ";")), &payload); err != nil {
+		t.Fatalf("data.js is not valid JSON: %v", err)
+	}
+	if len(payload.Headers) != 2 || len(payload.Rows) != 2 || payload.Rows[1][0] != "Kochi" {
+		t.Errorf("unexpected payload: %+v", payload)
+	}
+
+	// A rerun overwrites its own files and must not need a prompt when told.
+	cli, err = parseArgs([]string{input, target, "--split", "--overwrite"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := run(cli); err != nil {
+		t.Fatalf("rerunning with --overwrite failed: %v", err)
+	}
+
+	// Different rows must land on a different URL, or a browser holding the
+	// old data.js serves it against the new page.
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\nKochi,31\nDelhi,18\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(cli); err != nil {
+		t.Fatal(err)
+	}
+	if again := read(indexFile); strings.Contains(again, dataName) {
+		t.Errorf("changed rows kept the data URL %q", dataName)
+	}
+
+	// A conversion that fails must leave the served directory as it was.
+	before := read(indexFile)
+	broken := cli
+	broken.CSS = filepath.Join(directory, "missing.css")
+	if err := convertDirectory(broken, target); err == nil {
+		t.Error("a missing --css file was accepted")
+	}
+	if after := read(indexFile); after != before {
+		t.Error("a failed conversion left the previous index.html damaged")
+	}
+	entries, err := os.ReadDir(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".csvtotable-") {
+			t.Errorf("a failed conversion left the staging file %q behind", entry.Name())
+		}
+	}
+}
+
+func TestPreviewIsNotCached(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, indexFile), []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := previewHandler(directory)
+
+	// --serve rebuilds its directory every run onto a port the kernel reuses,
+	// so anything the browser keeps is a stale asset waiting to be mixed into
+	// a later page.
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control is %q, want no-store", got)
+	}
+	if recorder.Body.String() != "first" {
+		t.Errorf("served %q, want the file contents", recorder.Body.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(directory, indexFile), []byte("second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	recorder = httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("If-Modified-Since", time.Now().UTC().Format(http.TimeFormat))
+	handler.ServeHTTP(recorder, request)
+	if recorder.Body.String() != "second" {
+		t.Errorf("a rewritten file served %q; the preview must not go stale", recorder.Body.String())
+	}
+}
+
+func TestServeAddress(t *testing.T) {
+	// --serve takes an optional value, which urfave/cli has no notion of, so a
+	// bare --serve must not swallow the argument after it.
+	forms := []struct {
+		args    []string
+		serve   bool
+		address string
+		inputs  int
+	}{
+		{args: []string{"in.csv", "--serve"}, serve: true, inputs: 1},
+		{args: []string{"--serve", "in.csv"}, serve: true, inputs: 1},
+		{args: []string{"-s", "in.csv"}, serve: true, inputs: 1},
+		{args: []string{"--serve", ":8080", "in.csv"}, serve: true, address: ":8080", inputs: 1},
+		{args: []string{"--serve=127.0.0.1:8080", "in.csv"}, serve: true, address: "127.0.0.1:8080", inputs: 1},
+		{args: []string{"--serve", "[::1]:8080", "in.csv"}, serve: true, address: "[::1]:8080", inputs: 1},
+		{args: []string{"in.csv", "out.html"}, serve: false, inputs: 1},
+	}
+	// A -s that belongs to another flag is that flag's value, not this one.
+	guarded, err := parseArgs([]string{"--title", "-s", "in.csv", "out.html"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if guarded.Title != "-s" || guarded.Serve || len(guarded.InputFiles) != 1 {
+		t.Errorf("--title -s was rewritten: title=%q serve=%v inputs=%v",
+			guarded.Title, guarded.Serve, guarded.InputFiles)
+	}
+	for _, form := range forms {
+		cli, err := parseArgs(form.args)
+		if err != nil {
+			t.Errorf("%v: %v", form.args, err)
+			continue
+		}
+		if cli.Serve != form.serve || cli.Address != form.address || len(cli.InputFiles) != form.inputs {
+			t.Errorf("%v: serve=%v address=%q inputs=%v; want %v, %q, %d",
+				form.args, cli.Serve, cli.Address, cli.InputFiles, form.serve, form.address, form.inputs)
+		}
+	}
+
+	// An empty host binds loopback: putting the data on the network should
+	// take more than leaving the host off.
+	targets := map[string]string{
+		"":               "127.0.0.1:0",
+		":8080":          "127.0.0.1:8080",
+		"localhost:8080": "localhost:8080",
+		"0.0.0.0:8080":   "0.0.0.0:8080",
+		"[::1]:8080":     "[::1]:8080",
+	}
+	for address, want := range targets {
+		got, err := listenTarget(address)
+		if err != nil || got != want {
+			t.Errorf("listenTarget(%q) = %q, %v; want %q", address, got, err, want)
+		}
+	}
+	for _, bad := range []string{"8080", "nonsense", ":99999", "host:port"} {
+		if _, err := listenTarget(bad); err == nil {
+			t.Errorf("listenTarget(%q) was accepted", bad)
+		}
+	}
+
+	for bind, want := range map[string]bool{
+		"127.0.0.1:80": true, "localhost:80": true, "[::1]:80": true,
+		"0.0.0.0:80": false, "10.0.0.4:80": false,
+	} {
+		if got := loopbackOnly(bind); got != want {
+			t.Errorf("loopbackOnly(%q) = %v, want %v", bind, got, want)
+		}
 	}
 }

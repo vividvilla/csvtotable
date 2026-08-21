@@ -5,13 +5,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,7 +25,9 @@ import (
 	"runtime"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -59,6 +64,7 @@ type options struct {
 	PageSize        int
 	Overwrite       bool
 	Serve           bool
+	Address         string
 	Height          string
 	Pagination      bool
 	VirtualScroll   int64
@@ -72,6 +78,7 @@ type options struct {
 	CSS             string
 	JS              string
 	Compress        bool
+	Split           bool
 }
 
 type tableOptions struct {
@@ -123,6 +130,14 @@ func parseArgs(args []string) (options, error) {
 	return parsed, err
 }
 
+// listenAddress matches the [HOST]:PORT that --serve accepts: a bare port, a
+// host or IPv4 address, or a bracketed IPv6 address. Anything else after
+// --serve is a positional argument.
+var listenAddress = regexp.MustCompile(`^([A-Za-z0-9._-]*|\[[0-9A-Fa-f:.]+\]):[0-9]{1,5}$`)
+
+// serveNames are the spellings of the optional-value --serve flag.
+var serveNames = map[string]bool{"serve": true, "s": true}
+
 func protectStdioArgs(command *cli.Command, args []string) []string {
 	valueFlags := map[string]bool{}
 	for _, flag := range command.Flags {
@@ -156,6 +171,14 @@ func protectStdioArgs(command *cli.Command, args []string) []string {
 		name := strings.TrimLeft(protected[i], "-")
 		if before, _, found := strings.Cut(name, "="); found {
 			name = before
+		} else if serveNames[name] {
+			// --serve takes an optional value, which urfave/cli has no notion
+			// of. Only what looks like an address counts as one; otherwise the
+			// flag is pinned empty so the next argument stays positional.
+			expectValue = i+1 < len(protected) && listenAddress.MatchString(protected[i+1])
+			if !expectValue {
+				protected[i] += "="
+			}
 		} else {
 			expectValue = valueFlags[name]
 		}
@@ -181,7 +204,7 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.StringFlag{Name: "quotechar", Aliases: []string{"q"}, Value: "\"", Usage: "CSV quote character", Destination: &parsed.Quote},
 			&cli.IntFlag{Name: "page-size", Aliases: []string{"display-length", "dl"}, Value: -1, Usage: "Rows per page; -1 shows all rows", Destination: &parsed.PageSize},
 			&cli.BoolFlag{Name: "overwrite", Aliases: []string{"o"}, Usage: "Overwrite an existing output file", Destination: &parsed.Overwrite},
-			&cli.BoolFlag{Name: "serve", Aliases: []string{"s"}, Usage: "Open a temporary result in the default browser", Destination: &parsed.Serve},
+			&cli.StringFlag{Name: "serve", Aliases: []string{"s"}, Usage: "Build the page and serve it; takes an optional [HOST]:PORT", Destination: &parsed.Address},
 			&cli.StringFlag{Name: "height", Aliases: []string{"h"}, Usage: "Table height in px or viewport %", Destination: &parsed.Height},
 			&cli.BoolFlag{Name: "pagination", Aliases: []string{"p"}, Usage: "Disable pagination", Destination: &disablePagination},
 			&cli.Int64Flag{Name: "virtual-scroll", Aliases: []string{"vs"}, Value: 1000, Usage: "Virtual-scroll row threshold", Destination: &parsed.VirtualScroll},
@@ -195,8 +218,10 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.StringFlag{Name: "js", Usage: "Path to a script to inline into the page", Destination: &parsed.JS},
 			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
 			&cli.BoolFlag{Name: "no-compress", Usage: "Inline the frontend script uncompressed, for older browsers", Destination: &noCompress},
+			&cli.BoolFlag{Name: "split", Usage: "Write OUTPUT as a directory of separate files the browser can cache", Destination: &parsed.Split},
 		},
 		Action: func(_ context.Context, command *cli.Command) error {
+			parsed.Serve = command.IsSet("serve")
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
@@ -232,6 +257,9 @@ func newCommand(action func(options) error) *cli.Command {
 				parsed.InputFiles = positional[:len(positional)-1]
 				parsed.OutputFile = positional[len(positional)-1]
 			}
+			if parsed.Split && parsed.OutputFile == "-" {
+				return errors.New("--split writes a directory, so it cannot write to standard output")
+			}
 			stdinInputs := 0
 			for _, input := range parsed.InputFiles {
 				if input == "-" {
@@ -248,26 +276,29 @@ func newCommand(action func(options) error) *cli.Command {
 
 func run(cli options) error {
 	if cli.Serve {
-		temporary, err := os.CreateTemp("", "csvtotable-*.html")
-		if err != nil {
+		return serve(cli)
+	}
+
+	if cli.Split {
+		index := filepath.Join(cli.OutputFile, indexFile)
+		if _, err := os.Stat(index); err == nil && !cli.Overwrite {
+			if slices.Contains(cli.InputFiles, "-") {
+				return errors.New("output directory exists; use --overwrite when reading from standard input")
+			}
+			overwrite, err := promptOverwrite(index, os.Stdin)
+			if err != nil {
+				return err
+			}
+			if !overwrite {
+				return errors.New("aborted")
+			}
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		name := temporary.Name()
-		defer os.Remove(name)
-		if err := convert(cli, temporary); err != nil {
-			temporary.Close()
+		if err := convertDirectory(cli, cli.OutputFile); err != nil {
 			return err
 		}
-		if err := temporary.Close(); err != nil {
-			return err
-		}
-		if err := openBrowser(name); err != nil {
-			return err
-		}
-		interrupt := make(chan os.Signal, 1)
-		signal.Notify(interrupt, os.Interrupt)
-		defer signal.Stop(interrupt)
-		<-interrupt
+		fmt.Printf("Directory written successfully: %s\n", cli.OutputFile)
 		return nil
 	}
 
@@ -373,16 +404,143 @@ func resolveOutputPath(path string) (string, error) {
 	return "", errors.New("too many symbolic links in output path")
 }
 
-func openBrowser(path string) error {
-	absolute, err := filepath.Abs(path)
+// serve builds the page into a temporary directory and hands it to a local
+// HTTP server. The flag is named --serve, and over http:// the split assets are
+// fetched and cached the way a real deployment would do it.
+func serve(cli options) error {
+	directory, err := os.MkdirTemp("", "csvtotable-*")
 	if err != nil {
 		return err
 	}
-	address := (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String()
+	defer os.RemoveAll(directory)
+
+	if cli.Split {
+		if err := convertDirectory(cli, directory); err != nil {
+			return err
+		}
+	} else {
+		page, err := os.Create(filepath.Join(directory, indexFile))
+		if err != nil {
+			return err
+		}
+		if err := convert(cli, page); err != nil {
+			page.Close()
+			return err
+		}
+		if err := page.Close(); err != nil {
+			return err
+		}
+	}
+
+	bind, err := listenTarget(cli.Address)
+	if err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", bind)
+	if err != nil {
+		return err
+	}
+	server := &http.Server{Handler: previewHandler(directory)}
+	go server.Serve(listener)
+
+	address := "http://" + browsableAddress(listener.Addr()) + "/"
+	fmt.Printf("Serving %s — press Ctrl-C to stop\n", address)
+	if !loopbackOnly(bind) {
+		fmt.Fprintf(os.Stderr, "Warning: %s is reachable from the network, and the page contains your data\n", bind)
+	}
+	// A desktop without a browser handler is no reason to stop serving; the
+	// address is already on screen for the user to open themselves.
+	if err := openBrowser(address); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not open a browser: %v\n", err)
+	}
+	interrupt := make(chan os.Signal, 1)
+	// SIGTERM as well as Ctrl-C: a closed terminal or a supervisor stopping the
+	// process would otherwise skip the cleanup and strand the temporary
+	// directory, which in --split mode holds the whole frontend.
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(interrupt)
+	<-interrupt
+
+	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return server.Shutdown(shutdown)
+}
+
+// listenTarget turns the optional --serve value into an address to bind. An
+// empty value means a random loopback port; a value with no host means
+// loopback too, so that exposing the data on the network stays something you
+// have to write out in full.
+func listenTarget(address string) (string, error) {
+	if strings.TrimSpace(address) == "" {
+		return "127.0.0.1:0", nil
+	}
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return "", fmt.Errorf("--serve %q: expected [HOST]:PORT", address)
+	}
+	if number, err := strconv.Atoi(port); err != nil || number < 0 || number > 65535 {
+		return "", fmt.Errorf("--serve %q: %q is not a port", address, port)
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
+// loopbackOnly reports whether a bind address keeps the preview on this
+// machine. A hostname that is not plainly loopback counts as exposed.
+func loopbackOnly(bind string) bool {
+	host, _, err := net.SplitHostPort(bind)
+	if err != nil {
+		return false
+	}
+	if address := net.ParseIP(host); address != nil {
+		return address.IsLoopback()
+	}
+	return host == "localhost"
+}
+
+// browsableAddress swaps an unspecified bind for a host a browser can open.
+func browsableAddress(bound net.Addr) string {
+	address, ok := bound.(*net.TCPAddr)
+	if !ok {
+		return bound.String()
+	}
+	if address.IP == nil || address.IP.IsUnspecified() {
+		// An IPv6 wildcard is not necessarily reachable over IPv4: the socket
+		// is only dual-stack when the system says so.
+		host := "127.0.0.1"
+		if address.IP != nil && address.IP.To4() == nil {
+			host = "::1"
+		}
+		return net.JoinHostPort(host, strconv.Itoa(address.Port))
+	}
+	return address.String()
+}
+
+// previewHandler serves the built page with caching switched off. --serve
+// rebuilds its directory on every run and the kernel hands out ephemeral ports
+// that repeat, so http://127.0.0.1:PORT is not a stable identity for anything.
+// Left cacheable, a reload mixes assets from an earlier run into a later page —
+// visible in --split as stale colours, since that is the only mode with
+// separate assets to disagree with each other.
+func previewHandler(directory string) http.Handler {
+	files := http.FileServer(http.Dir(directory))
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Cache-Control", "no-store")
+		// Dropping the validators answers with the file rather than a 304, so
+		// a browser still holding an entry from an earlier run on this port
+		// cannot revalidate its way back to stale content.
+		request.Header.Del("If-Modified-Since")
+		request.Header.Del("If-None-Match")
+		files.ServeHTTP(writer, request)
+	})
+}
+
+func openBrowser(address string) error {
 	var command *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		address = (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(absolute)}).String()
 		command = exec.Command("rundll32", "url.dll,FileProtocolHandler", address)
 	case "darwin":
 		command = exec.Command("open", address)
@@ -402,7 +560,20 @@ func promptOverwrite(path string, input io.Reader) (bool, error) {
 	return answer == "y" || answer == "Y", nil
 }
 
+// convert writes the whole page to one writer. --split instead calls
+// writePage with the data pointed at a separate file; see convertDirectory.
 func convert(cli options, destination io.Writer) error {
+	page := bufio.NewWriter(destination)
+	if err := writePage(cli, page, page, nil); err != nil {
+		return err
+	}
+	return page.Flush()
+}
+
+// writePage renders the page into page and the row data into data. The two are
+// the same writer unless split is given, in which case the stylesheet and
+// script are referenced by relative path rather than inlined.
+func writePage(cli options, page, data *bufio.Writer, split *splitAssets) error {
 	delimiter, err := csvCharacter(cli.Delimiter, "delimiter")
 	if err != nil {
 		return err
@@ -500,7 +671,10 @@ func convert(cli options, destination io.Writer) error {
 	if err != nil {
 		return err
 	}
-	output := bufio.NewWriter(destination)
+	stylesheetHTML := "<style>" + inlineStyle(tableCSS) + "</style>\n"
+	if split != nil {
+		stylesheetHTML = `<link rel="stylesheet" href="` + split.css + "\">\n"
+	}
 	headers := []string{}
 	expectedColumns := -1
 	started := false
@@ -510,7 +684,14 @@ func convert(cli options, destination io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(output, "<!doctype html>\n<html lang=\"en\"%s>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n<style>%s</style>\n%s</head>\n<body>\n<main class=\"csvtotable\">\n%s%s\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", themeAttribute, html.EscapeString(title), inlineStyle(tableCSS), styleHTML, headerHTML, themePicker.String(), tableLabel, headersJSON)
+		if _, err := fmt.Fprintf(page, "<!doctype html>\n<html lang=\"en\"%s>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>%s</title>\n%s%s</head>\n<body>\n<main class=\"csvtotable\">\n%s%s\n<table class=\"csvtotable-table\" id=\"csvtotable-table\"%s></table>\n</main>\n", themeAttribute, html.EscapeString(title), stylesheetHTML, styleHTML, headerHTML, themePicker.String(), tableLabel); err != nil {
+			return err
+		}
+		if split != nil {
+			_, err = fmt.Fprintf(data, "window.csvtotableData={\"headers\":%s,\"rows\":[", headersJSON)
+		} else {
+			_, err = fmt.Fprintf(page, "<script id=\"csvtotable-data\" type=\"application/json\">{\"headers\":%s,\"rows\":[", headersJSON)
+		}
 		started = err == nil
 		return err
 	}
@@ -520,11 +701,11 @@ func convert(cli options, destination io.Writer) error {
 			return err
 		}
 		if needsComma {
-			if err := output.WriteByte(','); err != nil {
+			if err := data.WriteByte(','); err != nil {
 				return err
 			}
 		}
-		if _, err := output.Write(encoded); err != nil {
+		if _, err := data.Write(encoded); err != nil {
 			return err
 		}
 		needsComma = true
@@ -606,19 +787,57 @@ func convert(cli options, destination io.Writer) error {
 		}
 	}
 
-	scriptsHTML, err := scriptsMarkup(cli.Compress, customJS)
+	if split != nil {
+		if _, err := io.WriteString(data, "]};\n"); err != nil {
+			return err
+		}
+		// The data file is complete, so its hash — and therefore its name — is
+		// settled and the page can link to it.
+		if err := data.Flush(); err != nil {
+			return err
+		}
+	} else if _, err := io.WriteString(page, "]}</script>\n"); err != nil {
+		return err
+	}
+	scriptsHTML, err := scriptsMarkup(cli.Compress, customJS, split)
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n%s</body>\n</html>\n", optionsJSON, scriptsHTML); err != nil {
-		return err
-	}
-	return output.Flush()
+	_, err = fmt.Fprintf(page, "<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n%s</body>\n</html>\n", optionsJSON, scriptsHTML)
+	return err
 }
 
-// bootstrap builds the table once the frontend bundle is in scope. Both the
-// plain and the compressed paths end by running it.
-const bootstrap = `CsvToTable.setupTheme("#csvtotable-theme");CsvToTable.table=CsvToTable.createCsvTable("#csvtotable-table",JSON.parse(document.getElementById("csvtotable-data").textContent),JSON.parse(document.getElementById("csvtotable-options").textContent));`
+// bootstrapFormat builds the table once the frontend bundle is in scope. Every
+// path ends by running it; they differ only in where the rows come from.
+const bootstrapFormat = `CsvToTable.setupTheme("#csvtotable-theme");CsvToTable.table=CsvToTable.createCsvTable("#csvtotable-table",%s,JSON.parse(document.getElementById("csvtotable-options").textContent));`
+
+var (
+	bootstrap      = fmt.Sprintf(bootstrapFormat, `JSON.parse(document.getElementById("csvtotable-data").textContent)`)
+	splitBootstrap = fmt.Sprintf(bootstrapFormat, "window.csvtotableData")
+)
+
+// indexFile is the only fixed name --split writes: everything it links to
+// carries a hash of its contents, so a regenerated directory can never serve a
+// stale asset against a fresh page. The entry point has to stay put for the
+// URL to keep working, which leaves its freshness to the server, as with any
+// static site.
+const indexFile = "index.html"
+
+// splitAssets are the files a --split page links to. The data file is named
+// last: its hash is only known once every row has been written.
+type splitAssets struct {
+	css      string
+	js       string
+	dataName func() string
+}
+
+// hashedName inserts a content digest before the extension, so unchanged
+// assets keep their URL across runs and changed ones cannot be mistaken for
+// them.
+func hashedName(stem, extension, content string) string {
+	digest := sha256.Sum256([]byte(content))
+	return fmt.Sprintf("%s.%s%s", stem, hex.EncodeToString(digest[:])[:12], extension)
+}
 
 // inflater unpacks the gzipped bundle, builds the table, then runs whatever
 // --js supplied. Appending <script> elements rather than eval keeps everything
@@ -643,10 +862,21 @@ throw error;
 // The custom script is inert markup in the compressed page and run by the
 // inflater, because a plain <script> would execute while the bundle was still
 // unpacking and find no CsvToTable.table to work with.
-func scriptsMarkup(compress bool, customJS string) (string, error) {
+func scriptsMarkup(compress bool, customJS string, split *splitAssets) (string, error) {
 	custom := ""
 	if strings.TrimSpace(customJS) != "" {
 		custom = inlineScript(customJS)
+	}
+	// A split page has nothing to unpack: the browser caches the assets it
+	// already fetched, which is what compressing them was standing in for.
+	if split != nil {
+		markup := `<script src="` + split.dataName() + `"></script>` + "\n" +
+			`<script src="` + split.js + `"></script>` + "\n" +
+			"<script>" + splitBootstrap + "</script>\n"
+		if custom != "" {
+			markup += "<script>" + custom + "</script>\n"
+		}
+		return markup, nil
 	}
 	if !compress {
 		markup := "<script>" + inlineScript(tableJS) + "</script>\n<script>" + bootstrap + "</script>\n"
@@ -682,6 +912,103 @@ func packAsset(source string) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(packed.Bytes()), nil
+}
+
+// convertDirectory writes index.html and its assets into dir as separate
+// files, referenced by relative path. Opening index.html from disk still works
+// — <link> and <script src> resolve over file://, unlike fetch — but the point
+// is a served copy, where the browser caches the assets across pages.
+func convertDirectory(cli options, dir string) error {
+	if err := os.MkdirAll(dir, 0o777); err != nil {
+		return err
+	}
+
+	// Everything is staged under a temporary name and renamed in only once the
+	// conversion has succeeded. Writing in place would truncate a directory
+	// that is already being served the moment anything downstream fails, and
+	// would clobber an input file that happens to live in the target.
+	// staged is every temporary path, tracked separately from the names they
+	// will be published under: a file has to be cleaned up from the moment it
+	// exists, which is before its final name is always known.
+	staged := []string{}
+	pending := map[string]string{}
+	published := false
+	defer func() {
+		if published {
+			return
+		}
+		for _, temporary := range staged {
+			os.Remove(temporary)
+		}
+	}()
+	stage := func() (*os.File, error) {
+		file, err := os.CreateTemp(dir, ".csvtotable-*")
+		if err != nil {
+			return nil, err
+		}
+		staged = append(staged, file.Name())
+		if err := file.Chmod(0o644); err != nil {
+			file.Close()
+			return nil, err
+		}
+		return file, nil
+	}
+
+	assets := splitAssets{
+		css: hashedName("csvtotable", ".css", tableCSS),
+		js:  hashedName("csvtotable", ".js", tableJS),
+	}
+	for name, content := range map[string]string{assets.css: tableCSS, assets.js: tableJS} {
+		file, err := stage()
+		if err != nil {
+			return err
+		}
+		_, writeErr := io.WriteString(file, content)
+		pending[file.Name()] = name
+		if err := errors.Join(writeErr, file.Close()); err != nil {
+			return err
+		}
+	}
+
+	index, err := stage()
+	if err != nil {
+		return err
+	}
+	defer index.Close()
+	pending[index.Name()] = indexFile
+	rows, err := stage()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	digest := sha256.New()
+	page := bufio.NewWriter(index)
+	data := bufio.NewWriter(io.MultiWriter(rows, digest))
+	assets.dataName = func() string {
+		return "data." + hex.EncodeToString(digest.Sum(nil))[:12] + ".js"
+	}
+
+	// writePage flushes data before it asks for the name, so the digest covers
+	// every row by the time the page links to it.
+	if err := writePage(cli, page, data, &assets); err != nil {
+		return err
+	}
+	if err := page.Flush(); err != nil {
+		return err
+	}
+	pending[rows.Name()] = assets.dataName()
+	if err := errors.Join(index.Close(), rows.Close()); err != nil {
+		return err
+	}
+
+	for temporary, name := range pending {
+		if err := os.Rename(temporary, filepath.Join(dir, name)); err != nil {
+			return err
+		}
+	}
+	published = true
+	return nil
 }
 
 // decompress transparently unwraps gzip input, detected by magic bytes so it

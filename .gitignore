@@ -1,6 +1,7 @@
 # Build and release artifacts
 /build/
 /dist/
+/site/
 /table/dist/
 /target/
 /csvtotable

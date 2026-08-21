@@ -44,7 +44,7 @@ HOST_PLATFORMS = {
     ("windows", "amd64"): "win32-x64",
     ("windows", "x86_64"): "win32-x64",
 }
-MARKERS = (b"DataTables 3.0.2", b"--csvtotable-accent")
+MARKERS = (b"DataTables 3.0.2", b"--ct-accent")
 
 
 def main() -> None:

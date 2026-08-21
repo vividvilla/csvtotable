@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf16"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func TestConverterCompatibility(t *testing.T) {
@@ -23,11 +25,11 @@ func TestConverterCompatibility(t *testing.T) {
 	if err := os.WriteFile(input, []byte("name,value\nalice,\"</script><script>alert(1)</script>\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cli, err := parseArgs([]string{input, output, "-dl", "25", "-vs", "0", "-eo", "json", "-ps", "-p", "-e", "-h", "50vh", "-c", "<Table>"})
+	cli, err := parseArgs([]string{input, output, "-dl", "25", "-vs", "0", "-eo", "json", "-ps", "-p", "-e", "-h", "50vh", "-c", `\<Table\>`})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cli.DisplayLength != 25 || cli.VirtualScroll != 0 || cli.Height != "50vh" || !cli.PreserveSort || cli.Pagination || cli.ExportEnabled {
+	if cli.PageSize != 25 || cli.VirtualScroll != 0 || cli.Height != "50vh" || !cli.PreserveSort || cli.Pagination || cli.ExportEnabled {
 		t.Fatalf("legacy flags were not preserved: %+v", cli)
 	}
 	if err := run(cli); err != nil {
@@ -40,14 +42,15 @@ func TestConverterCompatibility(t *testing.T) {
 	html := string(page)
 	checks := []string{
 		"<title>&lt;Table&gt;</title>",
-		"<caption>&lt;Table&gt;</caption>",
-		"<button id=\"theme-toggle\"",
-		"CsvToTable.setupTheme(\"#theme-toggle\")",
+		"<h1 class=\"csvtotable-title\" id=\"csvtotable-title\">&lt;Table&gt;</h1>",
+		`aria-labelledby="csvtotable-title"`,
+		"<select class=\"csvtotable-theme\" id=\"csvtotable-theme\"",
+		"CsvToTable.setupTheme(\"#csvtotable-theme\")",
 		`"headers":["name","value"]`,
 		`"pagination":false`,
 		`"height":"50vh"`,
 		"DataTables 3.0.2",
-		"--csvtotable-accent",
+		"--ct-accent",
 		`\u003c/script\u003e`,
 	}
 	for _, check := range checks {
@@ -59,9 +62,9 @@ func TestConverterCompatibility(t *testing.T) {
 		t.Fatal("generated HTML references external assets or contains unsafe script data")
 	}
 
-	alias, err := parseArgs([]string{input, filepath.Join(directory, "alias.html"), "--title", "Alias"})
-	if err != nil || alias.Caption != "Alias" {
-		t.Fatalf("--title alias failed: %+v, %v", alias, err)
+	alias, err := parseArgs([]string{input, filepath.Join(directory, "alias.html"), "--caption", "Alias"})
+	if err != nil || alias.Title != "Alias" {
+		t.Fatalf("--caption alias failed: %+v, %v", alias, err)
 	}
 	withoutCaption := filepath.Join(directory, "no-caption.html")
 	cli, err = parseArgs([]string{input, withoutCaption})
@@ -72,8 +75,8 @@ func TestConverterCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	page, _ = os.ReadFile(withoutCaption)
-	if strings.Contains(string(page), "<caption>") {
-		t.Fatal("empty caption rendered a caption element")
+	if strings.Contains(string(page), `<h1 class="csvtotable-title"`) {
+		t.Fatal("empty caption rendered a heading")
 	}
 
 	for height, want := range map[string]string{"70%": `"height":"70vh"`, "calc(100% - 2rem)": `"height":"calc(100% - 2rem)"`} {
@@ -128,7 +131,7 @@ func TestStdioArgumentsAndServeValidation(t *testing.T) {
 		t.Fatalf("no arguments did not show help: %v\n%s", err, help.String())
 	}
 	cli, err := parseArgs([]string{"-", "-", "--caption", "stdin"})
-	if err != nil || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "-" || cli.OutputFile != "-" || cli.Caption != "stdin" {
+	if err != nil || len(cli.InputFiles) != 1 || cli.InputFiles[0] != "-" || cli.OutputFile != "-" || cli.Title != "stdin" {
 		t.Fatalf("stdio arguments were not preserved: %+v, %v", cli, err)
 	}
 	cli, err = parseArgs([]string{"--delimiter", "-", "input.csv", "output.html"})
@@ -427,5 +430,406 @@ func TestToolbarAndColumnFilterOptions(t *testing.T) {
 	}
 	if parsed.ColumnFilters {
 		t.Error("--no-column-filters did not disable column filters")
+	}
+}
+
+func TestTitleAndDescriptionRendering(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	notes := filepath.Join(directory, "notes.md")
+	if err := os.WriteFile(notes, []byte("Pulled from the **warehouse**.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	markdown := base
+	markdown.Title = "Sales *for* `Q3`"
+	markdown.Description = "@" + notes
+	var rendered bytes.Buffer
+	if err := convert(markdown, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<h1 class="csvtotable-title" id="csvtotable-title">Sales <em>for</em> <code>Q3</code></h1>`,
+		`<div class="csvtotable-description"><p>Pulled from the <strong>warehouse</strong>.</p></div>`,
+		"<title>Sales for Q3</title>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("rendered page is missing %s", want)
+		}
+	}
+
+	raw := base
+	raw.TitleHTML = `<span>Ops <b>Dash</b></span>`
+	raw.DescriptionHTML = `<p>Raw <a href="#">link</a></p>`
+	rendered.Reset()
+	if err := convert(raw, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page = rendered.String()
+	for _, want := range []string{
+		`<h1 class="csvtotable-title" id="csvtotable-title"><span>Ops <b>Dash</b></span></h1>`,
+		`<div class="csvtotable-description"><p>Raw <a href="#">link</a></p></div>`,
+		"<title>Ops Dash</title>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("raw HTML page is missing %s", want)
+		}
+	}
+
+	unsafe := base
+	unsafe.Title = "Hi <script>alert(1)</script>"
+	rendered.Reset()
+	if err := convert(unsafe, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), "<script>alert(1)") {
+		t.Error("Markdown mode passed raw HTML through")
+	}
+
+	missing := base
+	missing.Description = "@" + filepath.Join(directory, "absent.md")
+	if err := convert(missing, io.Discard); err == nil || !strings.Contains(err.Error(), "description") {
+		t.Fatalf("missing description file was accepted: %v", err)
+	}
+
+	if _, err := parseArgs([]string{"--title", "a", "--title-html", "b", input, "out.html"}); err == nil {
+		t.Error("--title and --title-html were accepted together")
+	}
+	if _, err := parseArgs([]string{"--description", "a", "--description-html", "b", input, "out.html"}); err == nil {
+		t.Error("--description and --description-html were accepted together")
+	}
+	sized, err := parseArgs([]string{"--page-size", "25", input, "out.html"})
+	if err != nil || sized.PageSize != 25 {
+		t.Fatalf("--page-size failed: %+v, %v", sized, err)
+	}
+}
+
+func TestWorkbookInput(t *testing.T) {
+	directory := t.TempDir()
+	workbook := excelize.NewFile()
+	defer workbook.Close()
+	sheet := workbook.GetSheetName(0)
+	for index, row := range [][]any{
+		{"city", "temperature", "note"},
+		{"Pune", 29, "warm"},
+		{"Mumbai", 31},
+	} {
+		cell, err := excelize.CoordinatesToCellName(1, index+1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := workbook.SetSheetRow(sheet, cell, &row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(directory, "input.xlsx")
+	if err := workbook.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+
+	var rendered bytes.Buffer
+	if err := convert(options{InputFiles: []string{path}, Delimiter: ",", Quote: "\""}, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`"headers":["city","temperature","note"]`,
+		`["Pune","29","warm"]`,
+		`["Mumbai","31",""]`, // trailing empty cells are dropped by the format
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("workbook output is missing %s", want)
+		}
+	}
+
+	notWorkbook := filepath.Join(directory, "fake.xlsx")
+	if err := os.WriteFile(notWorkbook, []byte("PK\x03\x04not a workbook"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(options{InputFiles: []string{notWorkbook}, Delimiter: ",", Quote: "\""}, io.Discard); err == nil {
+		t.Error("a corrupt workbook was accepted")
+	}
+}
+
+func TestThemes(t *testing.T) {
+	// The CLI list and the stylesheet's [data-theme] blocks have to agree, or
+	// --theme silently produces an unstyled page.
+	for _, name := range themes {
+		if name == "auto" {
+			continue
+		}
+		// The minifier drops the attribute-value quotes.
+		if !strings.Contains(tableCSS, "[data-theme="+name+"]") {
+			t.Errorf("stylesheet has no block for theme %q", name)
+		}
+	}
+
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	named := base
+	named.Theme = "nord"
+	var rendered bytes.Buffer
+	if err := convert(named, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<html lang="en" data-theme="nord">`,
+		`<option value="nord" selected>Nord</option>`,
+		`<select class="csvtotable-theme" id="csvtotable-theme" aria-label="Colour theme">`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("themed page is missing %s", want)
+		}
+	}
+
+	// "auto" pins nothing, leaving the stylesheet to follow the system.
+	auto := base
+	auto.Theme = "auto"
+	rendered.Reset()
+	if err := convert(auto, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	// The stylesheet itself is full of [data-theme=...] selectors, so look at
+	// the root element specifically.
+	if strings.Contains(rendered.String(), `<html lang="en" data-theme=`) {
+		t.Error("auto pinned a theme on the root element")
+	}
+
+	parsed, err := parseArgs([]string{"--theme", "gruvbox", input, "out.html"})
+	if err != nil || parsed.Theme != "gruvbox" {
+		t.Fatalf("--theme gruvbox failed: %+v, %v", parsed, err)
+	}
+	if parsed, err := parseArgs([]string{input, "out.html"}); err != nil || parsed.Theme != "auto" {
+		t.Fatalf("theme did not default to auto: %+v, %v", parsed, err)
+	}
+	if _, err := parseArgs([]string{"--theme", "bogus", input, "out.html"}); err == nil {
+		t.Error("an unknown theme was accepted")
+	}
+}
+
+func TestCustomCSSAndJS(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\""}
+
+	write := func(name, content string) string {
+		path := filepath.Join(directory, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	css, js := ".csvtotable-title{color:red}", "CsvToTable.table.draw()"
+
+	cli := base
+	cli.CSS = write("custom.css", css)
+	cli.JS = write("custom.js", js)
+	var rendered bytes.Buffer
+	if err := convert(cli, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+
+	// Placement is the whole feature: CSS after the built-in sheet so it wins
+	// on equal specificity, JS after the bootstrap so the table exists.
+	style := strings.Index(page, "<style>"+css+"</style>")
+	if style < 0 {
+		t.Fatal("custom CSS was not emitted")
+	}
+	if style < strings.Index(page, "<style>:root") || style > strings.Index(page, "</head>") {
+		t.Error("custom CSS is not the last thing in <head>")
+	}
+	script := strings.Index(page, "<script>"+js+"</script>")
+	if script < 0 {
+		t.Fatal("custom JS was not emitted")
+	}
+	if script < strings.Index(page, "CsvToTable.table=CsvToTable.createCsvTable") {
+		t.Error("custom JS runs before the table is built")
+	}
+	if script > strings.Index(page, "</body>") {
+		t.Error("custom JS is outside <body>")
+	}
+
+	// User content must not be able to close the tag it sits in.
+	breakout := base
+	breakout.CSS = write("breakout.css", "</style><b>x")
+	breakout.JS = write("breakout.js", "</script><b>x")
+	rendered.Reset()
+	if err := convert(breakout, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page = rendered.String()
+	if strings.Contains(page, "<style></style>") || strings.Contains(page, "<script></script>") {
+		t.Error("custom content broke out of its tag")
+	}
+	for _, want := range []string{`<\/style`, `<\/script`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("custom content is missing the %s escape", want)
+		}
+	}
+
+	// A leading @ is tolerated for symmetry with --description but means
+	// nothing here, so both spellings must produce the same page.
+	stylesheet := write("extra.css", ".from-file{color:blue}")
+	var plain, prefixed bytes.Buffer
+	bare, at := base, base
+	bare.CSS, at.CSS = stylesheet, "@"+stylesheet
+	if err := convert(bare, &plain); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(at, &prefixed); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plain.String(), ".from-file{color:blue}") {
+		t.Error("stylesheet was not inlined")
+	}
+	if plain.String() != prefixed.String() {
+		t.Error("a leading @ changed the output")
+	}
+	for flag, cli := range map[string]options{
+		"css": {InputFiles: []string{input}, Delimiter: ",", Quote: "\"", CSS: filepath.Join(directory, "absent.css")},
+		"js":  {InputFiles: []string{input}, Delimiter: ",", Quote: "\"", JS: filepath.Join(directory, "absent.js")},
+	} {
+		if err := convert(cli, io.Discard); err == nil || !strings.HasPrefix(err.Error(), flag+":") {
+			t.Errorf("missing %s file gave %v", flag, err)
+		}
+	}
+
+	// Nothing is emitted when the flags are unused.
+	rendered.Reset()
+	if err := convert(base, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), "<style></style>") || strings.Contains(rendered.String(), "<script></script>") {
+		t.Error("empty custom CSS or JS emitted a bare tag")
+	}
+}
+
+func TestCustomTheme(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A palette the stylesheet has never heard of is fine as long as --css can
+	// supply it, and the picker has to offer it or it would report the wrong
+	// theme with no way back.
+	stylesheet := filepath.Join(directory, "tokyonight.css")
+	if err := os.WriteFile(stylesheet, []byte(`[data-theme="tokyonight"]{--ct-paper:#1a1b26}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	custom := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\"",
+		Theme: "tokyonight", CSS: stylesheet}
+	var rendered bytes.Buffer
+	if err := convert(custom, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	page := rendered.String()
+	for _, want := range []string{
+		`<html lang="en" data-theme="tokyonight">`,
+		`<option value="tokyonight" selected>Tokyonight</option>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("custom-themed page is missing %s", want)
+		}
+	}
+
+	if _, err := parseArgs([]string{"--theme", "tokyonight", "--css", stylesheet, input, "out.html"}); err != nil {
+		t.Errorf("--theme with --css was rejected: %v", err)
+	}
+	if _, err := parseArgs([]string{"--theme", "tokyonight", input, "out.html"}); err == nil {
+		t.Error("an unknown theme was accepted without --css")
+	}
+}
+
+func TestInlineAssetEscaping(t *testing.T) {
+	// The HTML tokenizer matches end tags case-insensitively, and "<!--"
+	// followed by "<script" switches it to a state where "</script>" no longer
+	// closes the element. Both silently swallowed the rest of the document.
+	for _, source := range []string{`x="</SCRIPT>"`, `x="</ScRiPt >"`, `a="<!--"; b="<script /"`} {
+		escaped := inlineScript(source)
+		if scriptEndTag.MatchString(strings.ReplaceAll(escaped, `<\/`, "")) {
+			t.Errorf("inlineScript left a live end tag in %q -> %q", source, escaped)
+		}
+		if strings.Contains(escaped, "<!--") {
+			t.Errorf("inlineScript left a comment opener in %q -> %q", source, escaped)
+		}
+	}
+	// Case is preserved so string literals keep their value.
+	if got := inlineScript(`"</SCRIPT>"`); got != `"<\/SCRIPT>"` {
+		t.Errorf("inlineScript changed the case of the end tag: %q", got)
+	}
+	if got := inlineStyle(`a{content:"</STYLE>"}`); !strings.Contains(got, `<\/STYLE>`) {
+		t.Errorf("inlineStyle did not escape an uppercase end tag: %q", got)
+	}
+
+	// The embedded assets carry the same hazard, not just user content.
+	for name, asset := range map[string]string{"css": tableCSS, "js": tableJS} {
+		if strings.Contains(name, "js") && strings.Contains(inlineScript(asset), "<!--") {
+			t.Error("embedded bundle still contains a comment opener after escaping")
+		}
+	}
+
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A custom theme name reaches the picker markup and must be escaped.
+	var rendered bytes.Buffer
+	hostile := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\"",
+		Theme: `"><script>alert(1)</script>`, CSS: filepath.Join(directory, "theme.css")}
+	if err := os.WriteFile(hostile.CSS, []byte("x{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := convert(hostile, &rendered); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), `<option value=""><script>`) {
+		t.Error("a theme name broke out of the picker option")
+	}
+
+}
+
+func TestPaletteOverrideSpecificity(t *testing.T) {
+	// The auto-dark block must not out-weigh a plain :root rule, or a --css
+	// palette override is silently ignored on a dark-mode machine.
+	if strings.Contains(tableCSS, ":root:not([data-theme])") {
+		t.Error("the auto-dark palette outweighs a :root override; wrap its :not() in :where()")
+	}
+	if !strings.Contains(tableCSS, ":root:where(:not([data-theme]))") {
+		t.Error("the auto-dark palette no longer scopes itself to unpinned pages")
+	}
+}
+
+func TestCustomThemeIsDiscoverable(t *testing.T) {
+	// A --css theme is only reachable if the picker lists it. Go names the one
+	// passed to --theme; the frontend finds the rest by reading the stylesheet,
+	// so both halves have to agree on the attribute spelling.
+	if !strings.Contains(tableJS, "data-theme=") {
+		t.Error("the bundle no longer looks for [data-theme] blocks in loaded stylesheets")
+	}
+	for _, name := range themes {
+		if name == "auto" {
+			continue
+		}
+		if !strings.Contains(tableCSS, "[data-theme="+name+"]") {
+			t.Errorf("stylesheet has no block for theme %q", name)
+		}
 	}
 }

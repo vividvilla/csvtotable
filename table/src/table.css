@@ -1,104 +1,492 @@
-:root {
+/* A theme is nothing but a block of colour variables. Everything else in this
+   sheet reads them, so adding one means copying a block and changing values.
+   color-scheme comes along so native controls — scrollbars, dropdowns, the
+   caret — match the palette.
+
+   default and dark are also the system pair: with no data-theme pinned the
+   media query below picks between them before any script runs, which is why
+   their values appear twice. That block wraps its :not() in :where() so it
+   weighs no more than a plain :root, or a --css override of the palette would
+   lose to it in dark mode. (light-dark() would collapse that, but the CSS
+   bundler rewrites it into a prefers-color-scheme toggle that ignores an
+   explicit choice.) */
+:root,
+[data-theme="default"] {
   color-scheme: light;
-  --csvtotable-accent: #004da8;
-  --csvtotable-accent-hover: #003b82;
-  --csvtotable-border: #d1d5db;
-  --csvtotable-bg: #fff;
-  --csvtotable-text: #003b73;
+  --ct-paper: #fff;
+  --ct-ink: #15181d;
+  --ct-muted: #61666e;
+  --ct-rule: #e6e8eb;
+  --ct-rule-strong: #cbd0d6;
+  --ct-accent: #004da8;
+  --ct-wash: #eaf1fc;
+  --ct-hover: #f4f6f8;
 }
-:root.dark {
+
+[data-theme="dark"] {
   color-scheme: dark;
-  --csvtotable-accent: #60a5fa;
-  --csvtotable-accent-hover: #3b82f6;
-  --csvtotable-border: #4b5563;
-  --csvtotable-bg: #111827;
-  --csvtotable-text: #bfdbfe;
+  --ct-paper: #101317;
+  --ct-ink: #e7eaee;
+  --ct-muted: #98a0ab;
+  --ct-rule: #252a32;
+  --ct-rule-strong: #39414c;
+  --ct-accent: #74abf7;
+  --ct-wash: #15243a;
+  --ct-hover: #191d24;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme])) {
+    color-scheme: dark;
+    --ct-paper: #101317;
+    --ct-ink: #e7eaee;
+    --ct-muted: #98a0ab;
+    --ct-rule: #252a32;
+    --ct-rule-strong: #39414c;
+    --ct-accent: #74abf7;
+    --ct-wash: #15243a;
+    --ct-hover: #191d24;
+  }
+}
+
+/* Nord — https://www.nordtheme.com */
+[data-theme="nord"] {
+  color-scheme: dark;
+  --ct-paper: #2e3440;
+  --ct-ink: #eceff4;
+  --ct-muted: #a3aec2;
+  --ct-rule: #3b4252;
+  --ct-rule-strong: #4c566a;
+  --ct-accent: #88c0d0;
+  --ct-wash: #3b4252;
+  --ct-hover: #363e4d;
+}
+
+/* Gruvbox dark — https://github.com/morhetz/gruvbox */
+[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --ct-paper: #282828;
+  --ct-ink: #ebdbb2;
+  --ct-muted: #a89984;
+  --ct-rule: #3c3836;
+  --ct-rule-strong: #504945;
+  --ct-accent: #fabd2f;
+  --ct-wash: #3c3836;
+  --ct-hover: #32302f;
+}
+
+/* Solarized light — https://ethanschoonover.com/solarized */
+[data-theme="solarized"] {
+  color-scheme: light;
+  --ct-paper: #fdf6e3;
+  --ct-ink: #073642;
+  --ct-muted: #657b83;
+  --ct-rule: #eee8d5;
+  --ct-rule-strong: #d8d0b8;
+  --ct-accent: #268bd2;
+  --ct-wash: #e9e2cd;
+  --ct-hover: #f5eeda;
+}
+
+/* Type and metrics are theme-independent, so they live outside the palettes. */
+:root {
+  --ct-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ct-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ct-text-2xs: .6875rem;
+  --ct-text-xs: .75rem;
+  --ct-text-sm: .8125rem;
+  --ct-text-base: .875rem;
+  --ct-text-md: 1rem;
+  --ct-text-lg: 1.125rem;
+  --ct-text-xl: 1.375rem;
+  --ct-text-2xl: 1.75rem;
+}
+
+/* Sort carets ride DataTables' own tokens rather than duplicated selectors. */
+:root,
+table.dataTable {
+  --dt-order-arrow_color: var(--ct-muted);
+  --dt-order-arrow_color-current: var(--ct-accent);
+  --dt-order-arrow_opacity: .3;
+  --dt-order-arrow_opacity-current: 1;
+  --dt-order-header_outline-hover: 2px solid transparent;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+
 body {
-  background: var(--csvtotable-bg);
-  color: var(--csvtotable-text);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--ct-paper);
+  color: var(--ct-ink);
+  font-family: var(--ct-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
-main { margin: 1.5rem; }
-.csvtotable-theme {
-  background: var(--csvtotable-bg);
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
-  color: var(--csvtotable-accent);
-  cursor: pointer;
-  font: inherit;
-  padding: .35rem .6rem;
-  white-space: nowrap;
-}
-.csvtotable-theme:hover { border-color: var(--csvtotable-accent); }
-.csvtotable-theme:focus-visible {
-  outline: 2px solid var(--csvtotable-accent);
+
+main { padding: 1.6rem 1.5rem 1rem; }
+
+:focus-visible {
+  outline: 2px solid var(--ct-accent);
   outline-offset: 2px;
 }
-table.dataTable caption {
-  color: var(--csvtotable-accent);
-  font-size: 1.25rem;
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--ct-ink);
   font-weight: 600;
-  padding: .75rem 0 1rem;
+  letter-spacing: -.015em;
+  line-height: 1.3;
+  margin: 1rem 0 .5rem;
+}
+:is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+h1 { font-size: var(--ct-text-2xl); }
+h2 { font-size: var(--ct-text-xl); }
+h3 { font-size: var(--ct-text-lg); }
+h4, h5, h6 { font-size: var(--ct-text-md); }
+
+code {
+  background: var(--ct-hover);
+  border-radius: 4px;
+  font-family: var(--ct-mono);
+  font-size: .875em;
+  padding: .1em .3em;
+}
+
+.csvtotable-header { margin: 0 0 1.1rem; }
+.csvtotable-title { margin: 0 0 .6rem; }
+.csvtotable-title:last-child { margin-bottom: 0; }
+
+.csvtotable-description {
+  color: var(--ct-muted);
+  font-size: var(--ct-text-base);
+  line-height: 1.55;
+  margin: 0;
+  max-width: min(100ch, 100%);
+}
+.csvtotable-description > :first-child { margin-top: 0; }
+.csvtotable-description > :last-child { margin-bottom: 0; }
+.csvtotable-description p,
+.csvtotable-description ul,
+.csvtotable-description ol { margin: 0 0 .5rem; }
+.csvtotable-description ul,
+.csvtotable-description ol { padding-left: 1.1rem; }
+.csvtotable-description a { color: var(--ct-accent); }
+
+/* Toolbar ------------------------------------------------------------- */
+
+div.dt-container { color: var(--ct-ink); font-size: var(--ct-text-base); }
+
+div.dt-container div.dt-layout-row { margin: 0 0 .85rem; }
+div.dt-container div.dt-layout-row.dt-layout-table { margin: 0; }
+/* Space rows above the table with a bottom margin and rows below it with a top
+   one: a trailing margin escapes the container and the height fit cannot see it. */
+div.dt-container div.dt-layout-row.dt-layout-table ~ div.dt-layout-row { margin: .85rem 0 0; }
+div.dt-container div.dt-layout-start > *:not(:last-child) { margin-right: .9rem; }
+div.dt-container div.dt-layout-end > *:not(:first-child) { margin-left: .3rem; }
+
+div.dt-container div.dt-search { position: relative; }
+div.dt-container div.dt-search::before {
+  background-color: var(--ct-muted);
+  content: "";
+  height: 14px;
+  left: .65rem;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6'><circle cx='7' cy='7' r='4.3'/><path d='M10.4 10.4 14 14' stroke-linecap='round'/></svg>") no-repeat center / contain;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+}
+div.dt-container div.dt-search input {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 7px;
+  color: inherit;
+  font: inherit;
+  font-size: var(--ct-text-base);
+  margin: 0;
+  padding: .5rem .7rem .5rem 2.05rem;
+  width: 19rem;
+}
+div.dt-container div.dt-search input::placeholder { color: var(--ct-muted); }
+div.dt-container div.dt-search input:focus {
+  border-color: var(--ct-accent);
+  box-shadow: 0 0 0 3px var(--ct-wash);
+  outline: none;
+}
+
+div.dt-container div.dt-info {
+  color: var(--ct-muted);
+  font-family: var(--ct-mono);
+  font-size: var(--ct-text-xs);
+  padding: 0;
+  white-space: nowrap;
+}
+
+/* Everything but search is a ghost control: rare actions stay quiet. */
+div.dt-container div.dt-buttons { flex-wrap: wrap; gap: .15rem; }
+div.dt-container div.dt-buttons > button.dt-button,
+.csvtotable-theme {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ct-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ct-text-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  margin: 0;
+  padding: .45rem .6rem;
+  text-transform: none;
+}
+div.dt-container div.dt-buttons > button.dt-button:hover:not(.disabled),
+div.dt-container div.dt-buttons > button.dt-button.dt-button-active,
+.csvtotable-theme:hover {
+  background: var(--ct-hover);
+  border-color: transparent;
+  color: var(--ct-ink);
+}
+/* The picker keeps the ghost look of the toolbar buttons, with just enough
+   chrome to read as a control. */
+.csvtotable-theme {
+  padding-right: .35rem;
+}
+.csvtotable-theme:focus-visible { border-color: var(--ct-accent); }
+/* The scrim still closes the menu on an outside click; it just stops dimming
+   the whole page for a four-item dropdown. */
+div.dt-button-background { background: transparent; }
+div.dt-container div.dt-buttons span.dt-button-down-arrow {
+  font-size: 8px;
+  opacity: .8;
+  padding-left: 6px;
+}
+div.dt-button-collection {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  padding: .25rem;
+}
+div.dt-button-collection button.dt-button {
+  border-radius: 5px;
+  color: var(--ct-ink);
+  font-size: var(--ct-text-sm);
+  padding: .4rem .6rem;
   text-align: left;
 }
-.dt-container { font-size: .875rem; }
-.dt-container .dt-search input,
-.dt-container .dt-length select {
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
-  padding: .35rem .5rem;
+div.dt-button-collection button.dt-button:hover { background: var(--ct-hover); }
+
+/* Active filters ------------------------------------------------------ */
+
+.csvtotable-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin: -.35rem 0 .85rem;
 }
-.dt-container .dt-buttons > .dt-button {
-  background: var(--csvtotable-accent);
-  border: 0;
-  border-radius: .25rem;
-  color: #fff;
+.csvtotable-filters[hidden] { display: none; }
+
+.csvtotable-chip {
+  align-items: center;
+  background: var(--ct-wash);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--ct-accent);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--ct-text-xs);
+  gap: .4rem;
+  padding: .28rem .5rem .28rem .6rem;
+}
+.csvtotable-chip:hover { border-color: var(--ct-accent); }
+.csvtotable-chip-key {
+  color: var(--ct-muted);
+  font-size: var(--ct-text-2xs);
   font-weight: 600;
-  padding: .45rem .75rem;
+  letter-spacing: .07em;
   text-transform: uppercase;
 }
-.dt-container .dt-buttons > .dt-button:hover:not(.disabled) {
-  background: var(--csvtotable-accent-hover);
+.csvtotable-chip-value {
+  font-weight: 600;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csvtotable-chip-remove { font-size: var(--ct-text-base); line-height: 1; opacity: .55; }
+.csvtotable-chip:hover .csvtotable-chip-remove { opacity: 1; }
+
+.csvtotable-clear {
+  background: none;
   border: 0;
-  color: #fff;
+  border-radius: 4px;
+  color: var(--ct-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ct-text-xs);
+  margin-left: .25rem;
+  padding: .28rem .2rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.csvtotable-clear:hover { color: var(--ct-ink); }
+
+/* Table --------------------------------------------------------------- */
+
+table.dataTable {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+/* The table's outer text edges line up with the title and the search box
+   instead of sitting a cell-padding inside them. */
+table.dataTable > thead > tr > :first-child,
+table.dataTable > tfoot > tr > :first-child,
+table.dataTable > tbody > tr > :first-child { padding-left: 0; }
+table.dataTable > thead > tr > :last-child,
+table.dataTable > tfoot > tr > :last-child,
+table.dataTable > tbody > tr > :last-child { padding-right: 0; }
+
+table.dataTable > thead > tr > th,
+table.dataTable > thead > tr > td {
+  border-bottom: 1px solid var(--ct-rule-strong);
+  color: var(--ct-muted);
+  font-size: var(--ct-text-2xs);
+  font-weight: 600;
+  letter-spacing: .07em;
+  padding: .5rem .75rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+table.dataTable > thead > tr > th.dt-ordering-asc,
+table.dataTable > thead > tr > th.dt-ordering-desc { color: var(--ct-ink); }
+table.dataTable > thead > tr > th div.dt-column-header {
+  gap: .4rem;
+  justify-content: flex-start;
+}
+/* DataTables grows the title to fill the cell, which strands the caret at the
+   far edge and reads as a stray mark between two columns. */
+table.dataTable > thead > tr > th div.dt-column-header .dt-column-title { flex-grow: 0; }
+table.dataTable > thead > tr > th.dt-type-numeric div.dt-column-header,
+table.dataTable > thead > tr > th.dt-type-date div.dt-column-header {
+  justify-content: flex-end;
 }
 
-table.dataTable tfoot th {
-  font-weight: 400;
-  padding: .4rem .5rem;
+table.dataTable > tbody > tr { background: transparent; }
+table.dataTable > tbody > tr > td {
+  border-bottom: 1px solid var(--ct-rule);
+  color: var(--ct-ink);
+  font-size: var(--ct-text-sm);
+  padding: .48rem .75rem;
 }
-.dt-container tfoot input,
-.dt-container tfoot select {
-  border: 1px solid var(--csvtotable-border);
-  border-radius: .25rem;
+table.dataTable > tbody > tr:hover > td { background: var(--ct-hover); }
+table.dataTable > tbody > tr > td.dt-type-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The filter row lives in the footer so DataTables keeps it aligned through
+   column hides, but it belongs beside the headers it filters. */
+div.dt-container div.dt-scroll { display: flex; flex-direction: column; }
+div.dt-container div.dt-scroll-head { order: 1; }
+div.dt-container div.dt-scroll-foot { order: 2; }
+div.dt-container div.dt-scroll-body {
+  min-height: 0;
+  order: 3;
+  scrollbar-color: var(--ct-rule-strong) transparent;
+  scrollbar-width: thin;
+}
+div.dt-container div.dt-scroll { scrollbar-color: var(--ct-rule-strong) transparent; scrollbar-width: thin; }
+div.dt-container div.dt-scroll-foot { border-top: 0; }
+
+table.dataTable > tfoot > tr > th {
+  border-bottom: 1px solid var(--ct-rule-strong);
+  border-top: 0;
+  font-weight: 400;
+  padding: .4rem .5rem .55rem;
+  text-transform: none;
+}
+div.dt-container table.dataTable tfoot input,
+div.dt-container table.dataTable tfoot select {
+  background: var(--ct-hover);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: inherit;
   font: inherit;
+  font-size: var(--ct-text-xs);
   max-width: 20rem;
   min-width: 0;
-  padding: .25rem .35rem;
+  padding: .28rem .35rem;
   width: 100%;
 }
+div.dt-container table.dataTable tfoot input::placeholder { color: var(--ct-muted); opacity: .75; }
+div.dt-container table.dataTable tfoot input:hover,
+div.dt-container table.dataTable tfoot select:hover { border-color: var(--ct-rule-strong); }
+div.dt-container table.dataTable tfoot input:focus,
+div.dt-container table.dataTable tfoot select:focus {
+  background: var(--ct-paper);
+  border-color: var(--ct-accent);
+  outline: none;
+}
+
+/* Footer row ---------------------------------------------------------- */
+
+div.dt-container div.dt-length select {
+  background: var(--ct-paper);
+  border: 1px solid var(--ct-rule-strong);
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  font-size: var(--ct-text-sm);
+  padding: .3rem .4rem;
+}
+div.dt-container div.dt-paging button.dt-paging-button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ct-muted);
+  font-size: var(--ct-text-sm);
+  min-width: 2rem;
+  padding: .35rem .5rem;
+}
+div.dt-container div.dt-paging button.dt-paging-button:hover:not(.disabled) {
+  background: var(--ct-hover);
+  border: 0;
+  color: var(--ct-ink);
+}
+div.dt-container div.dt-paging button.dt-paging-button.current,
+div.dt-container div.dt-paging button.dt-paging-button.current:hover {
+  background: var(--ct-wash);
+  border: 0;
+  color: var(--ct-accent);
+  font-weight: 600;
+}
+div.dt-container div.dt-paging button.dt-paging-button.disabled { opacity: .35; }
 
 @media (max-width: 767px) {
-  main { margin: .75rem; }
-  .dt-container { font-size: .8125rem; }
-  .dt-container .dt-buttons { justify-content: flex-start; }
-  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end {
+  main { padding: 1rem .8rem; }
+  div.dt-container { font-size: var(--ct-text-sm); }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) {
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: .5rem;
+    justify-content: flex-start;
+    margin: 0;
+    text-align: left;
     width: 100%;
   }
-  .dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell.dt-layout-end > * {
-    margin: 0;
-  }
-  .dt-container .dt-search { flex: 1; }
-  .dt-container .dt-search label { display: block; }
-  .dt-container .dt-search input {
-    margin: 0;
-    width: 100%;
-  }
+  div.dt-container div.dt-layout-row:not(.dt-layout-table) div.dt-layout-cell > * { margin: 0; }
+  div.dt-container div.dt-search { flex: 1 1 100%; }
+  div.dt-container div.dt-search input { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

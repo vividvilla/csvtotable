@@ -27,8 +27,14 @@ const themeKey = "csvtotable-theme";
 const filterChoiceLimit = 25;
 // Stands in for the search box in the active-filter list, which is keyed by column.
 const globalSearch = -1;
-// Least of the viewport the table keeps when the heading and description are tall.
-const minimumViewportShare = 0.6;
+// A heading taller than this much of the viewport is treated as oversized:
+// rather than shrink the table to whatever is left, give the table
+// tableViewportShare and let the page scroll.
+const headingViewportShare = 0.5;
+const tableViewportShare = 0.7;
+// Shorter than this and the table is not worth scrolling; the page scrolls
+// instead. A cap, not a height, so a table with few rows still shrinks to fit.
+const minimumTableHeight = 300;
 
 buttons.json = {
   text: "JSON",
@@ -282,11 +288,16 @@ export function createCsvTable(selector: string, data: CsvTableData, options: Cs
         const trailing = container.getBoundingClientRect().bottom - bodyRect.bottom;
         const available =
           window.innerHeight - (bodyRect.top + window.scrollY) - trailing - bottomMargin;
-        // A tall heading must not squeeze the table into a sliver; past this
-        // point the page scrolls instead.
-        const height = Math.max(120, window.innerHeight * minimumViewportShare, available);
-        scrollBody.style.height = `${Math.floor(height)}px`;
-        scrollBody.style.maxHeight = scrollBody.style.height;
+        const heading = document.querySelector<HTMLElement>(".csvtotable-header");
+        const headingHeight = heading?.getBoundingClientRect().height ?? 0;
+        const limit =
+          headingHeight > window.innerHeight * headingViewportShare
+            ? window.innerHeight * tableViewportShare
+            : Math.max(minimumTableHeight, available);
+        // A cap rather than a height: fewer rows than the page can hold should
+        // leave the footer under the last row, not float it below empty space.
+        scrollBody.style.height = "";
+        scrollBody.style.maxHeight = `${Math.floor(limit)}px`;
         table.columns.adjust();
       });
     };

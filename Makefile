@@ -23,7 +23,7 @@ demo: build
 		--title "CSVtoTable Demo" \
 		--description @demo/description.md \
 		--css demo/custom.css \
-		--page-size 25 \
+		--page-size 50 \
 		demo/meteorite-landings-1.csv demo/meteorite-landings-2.csv \
 		site/index.html
 

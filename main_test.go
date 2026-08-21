@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -49,7 +50,7 @@ func TestConverterCompatibility(t *testing.T) {
 		`"headers":["name","value"]`,
 		`"pagination":false`,
 		`"height":"50vh"`,
-		"DataTables 3.0.2",
+		`<script id="csvtotable-bundle" type="application/gzip">`,
 		"--ct-accent",
 		`\u003c/script\u003e`,
 	}
@@ -831,5 +832,81 @@ func TestCustomThemeIsDiscoverable(t *testing.T) {
 		if !strings.Contains(tableCSS, "[data-theme="+name+"]") {
 			t.Errorf("stylesheet has no block for theme %q", name)
 		}
+	}
+}
+
+func TestBundleCompression(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "input.csv")
+	if err := os.WriteFile(input, []byte("city,temperature\nPune,29\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(directory, "custom.js")
+	if err := os.WriteFile(script, []byte("CsvToTable.table.draw()"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base := options{InputFiles: []string{input}, Delimiter: ",", Quote: "\"", JS: script}
+
+	var plain, packed bytes.Buffer
+	if err := convert(base, &plain); err != nil {
+		t.Fatal(err)
+	}
+	compressed := base
+	compressed.Compress = true
+	if err := convert(compressed, &packed); err != nil {
+		t.Fatal(err)
+	}
+
+	// The bundle is the bulk of an otherwise empty page, so compressing it has
+	// to show up as a substantially smaller file.
+	if packed.Len() > plain.Len()*3/5 {
+		t.Errorf("compressed page is %d bytes against %d uncompressed", packed.Len(), plain.Len())
+	}
+	if !strings.Contains(plain.String(), "DataTables 3.0.2") {
+		t.Error("uncompressed page is missing the bundle source")
+	}
+	if strings.Contains(packed.String(), "DataTables 3.0.2") {
+		t.Error("compressed page still carries the bundle source")
+	}
+	// The stylesheet stays readable: compressing it would leave the page
+	// unstyled until the inflater ran.
+	if !strings.Contains(packed.String(), "--ct-accent") {
+		t.Error("compressed page should keep its stylesheet inline")
+	}
+
+	page := packed.String()
+	blob := strings.Index(page, `<script id="csvtotable-bundle" type="application/gzip">`)
+	custom := strings.Index(page, `<script id="csvtotable-custom" type="text/plain">`)
+	run := strings.Index(page, "DecompressionStream")
+	if blob < 0 || custom < 0 || run < 0 {
+		t.Fatalf("compressed page is missing a script: blob=%d custom=%d inflater=%d", blob, custom, run)
+	}
+	// The inflater reads both blobs, so both must already be parsed. The
+	// custom script is inert markup until the inflater runs it, because a live
+	// <script> would execute before the table existed.
+	if run < blob || run < custom {
+		t.Error("the inflater runs before the payloads it reads")
+	}
+	if strings.Contains(page, "<script>CsvToTable.table.draw()</script>") {
+		t.Error("custom JS runs on its own, before the bundle is unpacked")
+	}
+
+	// Decoding the blob has to give back the bundle byte for byte.
+	encoded := page[blob+len(`<script id="csvtotable-bundle" type="application/gzip">`):]
+	encoded = encoded[:strings.Index(encoded, "</script>")]
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("bundle is not valid base64: %v", err)
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("bundle is not gzip: %v", err)
+	}
+	unpacked, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(unpacked) != tableJS {
+		t.Error("the unpacked bundle differs from the embedded one")
 	}
 }

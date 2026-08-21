@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +71,7 @@ type options struct {
 	Theme           string
 	CSS             string
 	JS              string
+	Compress        bool
 }
 
 type tableOptions struct {
@@ -163,7 +165,7 @@ func protectStdioArgs(command *cli.Command, args []string) []string {
 
 func newCommand(action func(options) error) *cli.Command {
 	var parsed options
-	var disablePagination, disableExport, noColumnFilters bool
+	var disablePagination, disableExport, noColumnFilters, noCompress bool
 	return &cli.Command{
 		Name:                      "csvtotable",
 		Usage:                     "Convert CSV files into searchable, sortable HTML tables",
@@ -192,11 +194,13 @@ func newCommand(action func(options) error) *cli.Command {
 			&cli.StringFlag{Name: "css", Usage: "Path to a stylesheet to inline into the page", Destination: &parsed.CSS},
 			&cli.StringFlag{Name: "js", Usage: "Path to a script to inline into the page", Destination: &parsed.JS},
 			&cli.BoolFlag{Name: "no-column-filters", Aliases: []string{"ncf"}, Usage: "Hide the per-column filter row", Destination: &noColumnFilters},
+			&cli.BoolFlag{Name: "no-compress", Usage: "Inline the frontend script uncompressed, for older browsers", Destination: &noCompress},
 		},
 		Action: func(_ context.Context, command *cli.Command) error {
 			parsed.Pagination = !disablePagination
 			parsed.ExportEnabled = !disableExport
 			parsed.ColumnFilters = !noColumnFilters
+			parsed.Compress = !noCompress
 			if !slices.Contains(themes, parsed.Theme) && parsed.CSS == "" {
 				return fmt.Errorf("invalid theme %q; choose from %s, or define your own with --css", parsed.Theme, strings.Join(themes, ", "))
 			}
@@ -434,10 +438,6 @@ func convert(cli options, destination io.Writer) error {
 	if strings.TrimSpace(customCSS) != "" {
 		styleHTML = "<style>" + inlineStyle(customCSS) + "</style>\n"
 	}
-	scriptHTML := ""
-	if strings.TrimSpace(customJS) != "" {
-		scriptHTML = "<script>" + inlineScript(customJS) + "</script>\n"
-	}
 
 	themeAttribute := ""
 	if cli.Theme != "" && cli.Theme != "auto" {
@@ -606,10 +606,82 @@ func convert(cli options, destination io.Writer) error {
 		}
 	}
 
-	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n<script>%s</script>\n<script>CsvToTable.setupTheme(\"#csvtotable-theme\");CsvToTable.table=CsvToTable.createCsvTable(\"#csvtotable-table\",JSON.parse(document.getElementById(\"csvtotable-data\").textContent),JSON.parse(document.getElementById(\"csvtotable-options\").textContent));</script>\n%s</body>\n</html>\n", optionsJSON, inlineScript(tableJS), scriptHTML); err != nil {
+	scriptsHTML, err := scriptsMarkup(cli.Compress, customJS)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(output, "]}</script>\n<script id=\"csvtotable-options\" type=\"application/json\">%s</script>\n%s</body>\n</html>\n", optionsJSON, scriptsHTML); err != nil {
 		return err
 	}
 	return output.Flush()
+}
+
+// bootstrap builds the table once the frontend bundle is in scope. Both the
+// plain and the compressed paths end by running it.
+const bootstrap = `CsvToTable.setupTheme("#csvtotable-theme");CsvToTable.table=CsvToTable.createCsvTable("#csvtotable-table",JSON.parse(document.getElementById("csvtotable-data").textContent),JSON.parse(document.getElementById("csvtotable-options").textContent));`
+
+// inflater unpacks the gzipped bundle, builds the table, then runs whatever
+// --js supplied. Appending <script> elements rather than eval keeps everything
+// in global scope, which is where a top-level script would have run anyway.
+const inflater = `(async()=>{
+const run=(source)=>{const element=document.createElement("script");element.textContent=source;document.body.appendChild(element);};
+const packed=document.getElementById("csvtotable-bundle").textContent;
+const stream=new Blob([Uint8Array.from(atob(packed),(c)=>c.charCodeAt(0))]).stream();
+run(await new Response(stream.pipeThrough(new DecompressionStream("gzip"))).text());
+%s
+const custom=document.getElementById("csvtotable-custom");
+if(custom)run(custom.textContent);
+})().catch((error)=>{
+document.getElementById("csvtotable-table").insertAdjacentHTML("beforebegin",'<p class="csvtotable-error">This table could not be unpacked. It needs a browser with gzip DecompressionStream \u2014 Chrome 103+, Firefox 113+, or Safari 16.4+ \u2014 or a page regenerated with --no-compress.</p>');
+throw error;
+});`
+
+// scriptsMarkup emits the frontend bundle, the code that builds the table, and
+// any --js script. Compressed, the bundle is roughly two-fifths of its source
+// size, at the cost of needing a browser that can inflate it.
+//
+// The custom script is inert markup in the compressed page and run by the
+// inflater, because a plain <script> would execute while the bundle was still
+// unpacking and find no CsvToTable.table to work with.
+func scriptsMarkup(compress bool, customJS string) (string, error) {
+	custom := ""
+	if strings.TrimSpace(customJS) != "" {
+		custom = inlineScript(customJS)
+	}
+	if !compress {
+		markup := "<script>" + inlineScript(tableJS) + "</script>\n<script>" + bootstrap + "</script>\n"
+		if custom != "" {
+			markup += "<script>" + custom + "</script>\n"
+		}
+		return markup, nil
+	}
+	packed, err := packAsset(tableJS)
+	if err != nil {
+		return "", err
+	}
+	markup := `<script id="csvtotable-bundle" type="application/gzip">` + packed + "</script>\n"
+	if custom != "" {
+		markup += `<script id="csvtotable-custom" type="text/plain">` + custom + "</script>\n"
+	}
+	return markup + "<script>" + fmt.Sprintf(inflater, bootstrap) + "</script>\n", nil
+}
+
+// packAsset gzips and base64-encodes an asset for the inflater. Base64 has no
+// HTML-significant characters, so the result needs none of the escaping raw
+// source does.
+func packAsset(source string) (string, error) {
+	var packed bytes.Buffer
+	writer, err := gzip.NewWriterLevel(&packed, gzip.BestCompression)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.WriteString(writer, source); err != nil {
+		return "", err
+	}
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(packed.Bytes()), nil
 }
 
 // decompress transparently unwraps gzip input, detected by magic bytes so it

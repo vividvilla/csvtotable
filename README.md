@@ -13,6 +13,7 @@ CSVtoTable converts CSV, TSV, and Excel files into interactive HTML tables.
 - Five colour themes, switchable in the page or fixed with `--theme`
 - Themes are just CSS variables — define your own with `--css` and it joins the picker
 - `--css` and `--js` inline your own stylesheet and script, with the live table API exposed
+- Self-unpacking output: the frontend ships gzipped, roughly halving every file
 - Mobile-responsive layout
 
 ![CSVtoTable demo](demo/table.gif)
@@ -132,6 +133,7 @@ The page is plain semantic HTML, and every element CSVtoTable owns carries a
 | `.csvtotable-filters` | active-filter chip row |
 | `.csvtotable-chip` | one active filter, with `-key`, `-value`, and `-remove` parts |
 | `.csvtotable-clear` | the "clear all" control |
+| `.csvtotable-error` | shown only when the page cannot unpack itself |
 
 A theme is nothing but a block of colour variables. Every rule in the
 stylesheet reads them, so a new theme is a copy of one block with different
@@ -184,8 +186,10 @@ CsvToTable.table.order([2, "desc"]).draw();   // sort by the third column
 CsvToTable.table.column(0).visible(false);    // hide the first column
 ```
 
-The table's height is fitted on the next animation frame, so a script that
-measures layout should wrap the read in `requestAnimationFrame`. Column widths
+In a compressed page the script is parked in an inert `<script
+type="text/plain">` and run by the unpacker, so it still runs after the table is
+built. The table's height is fitted on the next animation frame, so a script
+that measures layout should wrap the read in `requestAnimationFrame`. Column widths
 and the scroll height are set as inline styles, which a stylesheet cannot
 override — use `--height` for that.
 
@@ -205,6 +209,17 @@ Both flags are trusted input: whatever the files contain runs for anyone who
 opens the page, so do not generate them from untrusted data. Content is escaped only
 so it cannot break out of its `<style>` or `<script>` element; it is not
 sanitised.
+
+### Output size
+
+The frontend script is gzipped and base64'd into the page, which cuts an
+otherwise empty file from about 260KB to 145KB. Unpacking it needs
+`DecompressionStream` (Chrome 103+, Firefox 113+, Safari 16.4+); older browsers
+get a message saying so. `--no-compress` inlines the script as readable source
+instead, for those browsers or for grepping the output.
+
+The stylesheet is left uncompressed either way, so the page is styled at first
+paint rather than after the script has unpacked.
 
 Run `csvtotable --help` for all options or `csvtotable --version` for the version.
 For compatibility with version 2, `--caption`, `--display-length`, `--pagination`,

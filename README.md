@@ -13,7 +13,7 @@ CSVtoTable converts CSV and Excel files into interactive HTML tables.
 - Five colour themes, pickable in the page or fixed with `--theme`
 - Custom CSS and JavaScript inlined into the page with `--css` and `--js`
 
-![CSVtoTable demo](sample/table.gif)
+![CSVtoTable demo](demo/table.gif)
 
 **[Try the live demo](https://vividvilla.github.io/csvtotable/)** — a page built by CSVtoTable from the sample data, served as one static file.
 
@@ -33,7 +33,7 @@ csvtotable data.csv.gz data.html
 csvtotable sales.xlsx sales.html
 
 # Fetch CSV directly from a URL
-csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/sample/meteorite-landings-1.csv meteorites.html
+csvtotable https://raw.githubusercontent.com/vividvilla/csvtotable/master/demo/meteorite-landings-1.csv meteorites.html
 
 # Open a temporary page in the default browser
 csvtotable data.csv --serve
@@ -223,7 +223,7 @@ make dist    # binary and host-platform packages under dist/
 ```
 
 ```sh
-./build/csvtotable sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv /tmp/meteorites.html
+./build/csvtotable demo/meteorite-landings-1.csv demo/meteorite-landings-2.csv /tmp/meteorites.html
 ```
 
 ## License

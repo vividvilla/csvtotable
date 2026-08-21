@@ -20,10 +20,11 @@ test: frontend
 demo: build
 	mkdir -p site
 	./build/csvtotable$(EXE) --overwrite \
+		--title "CSVtoTable Demo" \
 		--description @demo/description.md \
-		--css sample/custom.css \
+		--css demo/custom.css \
 		--page-size 25 \
-		sample/meteorite-landings-1.csv sample/meteorite-landings-2.csv \
+		demo/meteorite-landings-1.csv demo/meteorite-landings-2.csv \
 		site/index.html
 
 dist: frontend

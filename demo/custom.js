@@ -1,10 +1,10 @@
 /*
  * Sample --js for csvtotable.
  *
- *   csvtotable sample/meteorite-landings-1.csv out.html \
+ *   csvtotable demo/meteorite-landings-1.csv out.html \
  *     --theme tokyonight \
- *     --css sample/custom.css \
- *     --js sample/custom.js
+ *     --css demo/custom.css \
+ *     --js demo/custom.js
  *
  * This runs after the table has been built, so CsvToTable.table is the live
  * DataTables API instance: https://datatables.net/reference/api/
@@ -27,8 +27,8 @@
   dialog.innerHTML = `
     <h2 style="margin:0 0 .5rem">Custom JavaScript is running</h2>
     <p style="margin:0 0 1rem;color:var(--ct-muted)">
-      This page was built with <code>--js sample/custom.js</code>. If you also
-      passed <code>--css sample/custom.css</code>, pick <strong>Tokyonight</strong>
+      This page was built with <code>--js demo/custom.js</code>. If you also
+      passed <code>--css demo/custom.css</code>, pick <strong>Tokyonight</strong>
       from the theme menu to see the stylesheet it adds.
     </p>
     <form method="dialog" style="margin:0">

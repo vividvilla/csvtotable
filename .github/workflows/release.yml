@@ -158,8 +158,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
@@ -182,5 +180,5 @@ jobs:
           fi
           echo "NPM_TAG=$tag" >> "$GITHUB_ENV"
       - name: Publish native packages
-        run: for package in dist/*.tgz; do npm publish "./$package" --access public --provenance --tag "$NPM_TAG"; done
-      - run: npm publish ./npm --access public --provenance --tag "$NPM_TAG"
+        run: for package in dist/*.tgz; do npm publish "./$package" --access public --tag "$NPM_TAG"; done
+      - run: npm publish ./npm --access public --tag "$NPM_TAG"

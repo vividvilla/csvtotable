@@ -109,6 +109,9 @@ jobs:
 
   publish-homebrew:
     needs: github-release
+    # The tap carries a single formula, so a prerelease tag would serve a beta
+    # to every `brew install`. Stable tags only.
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     environment: release
     steps:
